@@ -3,8 +3,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
 
     <application
-        android:label="MAL Downloader"
-        android:theme="@style/Theme.Material3">
+        android:label="MAL Downloader">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
