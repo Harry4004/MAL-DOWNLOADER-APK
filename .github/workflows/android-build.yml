@@ -19,15 +19,25 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: 'gradle'
         
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
+
+    - name: Generate wrapper (if missing)
+      run: |
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          echo "Gradle wrapper jar missing; bootstrapping wrapper"
+          curl -sLo gradle-install.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-install.zip -d /tmp/gradle8
+          /tmp/gradle8/gradle-8.7/bin/gradle wrapper --gradle-version 8.7
+        fi
       
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
     - name: Build debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew --version && ./gradlew assembleDebug --stacktrace --no-daemon
       
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
