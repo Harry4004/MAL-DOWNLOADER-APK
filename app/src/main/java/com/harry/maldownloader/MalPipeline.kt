@@ -267,7 +267,7 @@ object MalPipeline {
                 // Simple regex to find first image URL - in production use proper JSON parsing
                 val regex = "\"image\":\"([^\"]+)\"".toRegex()
                 val match = regex.find(json)
-                match?.groupValues?.get(1)?.replace("\\\/", "/")
+                match?.groupValues?.get(1)?.replace("\\/", "/")
             } else null
         } catch (_: Exception) { null }
     }
