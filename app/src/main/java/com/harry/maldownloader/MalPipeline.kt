@@ -138,4 +138,33 @@ suspend fun processEntry(root: File, entry: MalEntry, userCustomTags: List<Strin
     embedMetadataIntoImage(imageFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
     writeMetaJson(metaFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
     return ok
+}suspend fun enrichFromJikanIfMissing(entry: MalEntry): MalEntry {
+    val api = retrofit.create(JikanApi::class.java)
+    return try {
+        val resp = api.searchAnime(entry.title, 3)
+        val best = resp.data.firstOrNull()
+        if (best != null) {
+            val poster = entry.imageUrl ?: (best.images?.get("jpg")?.get("image_url")
+                ?: best.images?.get("webp")?.get("image_url"))
+            val desc = if (entry.description.isNullOrBlank()) best.synopsis else entry.description
+            val extraTags = best.genres?.mapNotNull { it.name } ?: emptyList()
+            entry.copy(
+                imageUrl = poster,
+                description = desc,
+                tags = (entry.tags + extraTags).distinct()
+            )
+        } else entry
+    } catch (_: Exception) {
+        entry
+    }
 }
+
+suspend fun processEntry(root: File, entry: MalEntry, userCustomTags: List<String>): Boolean {
+    val (imageFile, metaFile) = buildOutputPaths(root, entry.title)
+    val tags = enrichTags(entry.tags, entry.title, entry.description, userCustomTags)
+    val ok = ensureImageWithAllFallbacks(entry, imageFile)
+    embedMetadataIntoImage(imageFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
+    writeMetaJson(metaFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
+    return ok
+}
+
