@@ -38,7 +38,17 @@ class MainActivity : AppCompatActivity() {
         startButton.setOnClickListener {
             checkPermissionsAndStart()
         }
+
+        // Setup ViewModel and observe UI state
+        viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
+        viewModel.uiState.observe(this) { ui ->
+            startButton.isEnabled = !ui.isProcessing
+            logTextView.text = ui.logs.joinToString("\n")
+            logScrollView.post { logScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+        }
     }
+
+    private lateinit var viewModel: MainViewModel
 
     private fun checkPermissionsAndStart() {
         when {
@@ -62,10 +72,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startProcessing() {
-        // Reset logs
-        logTextView.text = ""
+        logTextView.text = ""  // Reset logs
 
-        // Suppose XML file is known or selected, here hardcoded for demo
         val xmlFile = File(getExternalFilesDir(null), "myanimelist_export.xml")
         if (!xmlFile.exists()) {
             appendLog("Error: MAL export XML file not found at ${xmlFile.absolutePath}")
@@ -104,7 +112,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun appendLog(text: String) = withContext(Dispatchers.Main) {
-        logTextView.append("$text\n")
+        logTextView.append(text + "\n")
         logScrollView.post { logScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
     }
+
 }
