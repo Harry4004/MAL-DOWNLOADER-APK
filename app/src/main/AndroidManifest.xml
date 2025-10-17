@@ -1,47 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions for network (Jikan API) and storage (XML file access; images saved internally) -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- For monitoring API connectivity -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- For legacy external storage access on Android 12L and below (prefer SAF) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <!-- Legacy write permission for Android 12L and below; consider removing if using SAF only -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-
-    <!-- Query for file picker on Android 13+ to access XML without full storage access -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.GET_CONTENT" />
-            <data android:mimeType="application/xml" />
-            <!-- Fallback for any file, but prefers XML -->
-            <data android:mimeType="*/*" />
-        </intent>
-    </queries>
-
-    <!-- Optional: Ensures touch UI compatibility -->
-    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="MAL Downloader"
-        <!-- Dark theme for black/grey UI with tag colors -->
         android:theme="@style/Theme.MALDownloader"
-        android:supportsRtl="true"
-        android:usesCleartextTraffic="true"
-        tools:targetApi="31">
+        android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MALDownloader"
-            <!-- Optional: Portrait for mobile-only development -->
-            android:screenOrientation="portrait">
+            android:theme="@style/Theme.MALDownloader">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
