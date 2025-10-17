@@ -33,22 +33,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _ui.value = uiState.copy(isProcessing = true)
-                appendLog("Parsing MAL file...")
-                val entries = MalPipeline.parseMalDataFile(getApplication(), path)
-                val customTags = uiState.customTagsCsv.split(",")
-                    .map { it.trim() }.filter { it.isNotEmpty() }
+                appendLog("Opening MAL file: $path")
 
-                appendLog("Found ${entries.size} entries")
+                val file = File(path)
+                appendLog("File size: ${file.length()} bytes")
+
+                if (!file.exists() || file.length() == 0L) {
+                    appendLog("Error: The selected MAL file is empty or could not be accessed.")
+                    return@launch
+                }
+
+                appendLog("Reading MAL XML contents...")
+                val preview = file.bufferedReader().use { it.readLines().take(20).joinToString("\n") }
+                appendLog("File preview (first 20 lines):\n$preview")
+
+                appendLog("Parsing MAL XML file...")
+                val entries = MalPipeline.parseMalDataFile(getApplication(), path) { log -> appendLog(log) }
+                appendLog("Parsed entries count: ${entries.size}")
+
+                if (entries.isEmpty()) {
+                    appendLog("Warning: No entries were detected. The file may use an unsupported format or malformed tags.")
+                    return@launch
+                }
+
+                val customTags = uiState.customTagsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
                 for ((idx, raw) in entries.withIndex()) {
-                    appendLog("Enriching [${idx + 1}/${entries.size}]: ${raw.title}")
-                    val enriched = MalPipeline.enrichFromJikanIfMissing(raw)
-                    val ok = MalPipeline.processEntry(baseDir, enriched, customTags)
-                    appendLog("Saved: ${enriched.title} -> ${if (ok) "OK" else "Placeholder"}")
+                    appendLog("Enriching entry [${idx + 1}/${entries.size}]: ${raw.title}")
+                    val enriched = MalPipeline.enrichFromJikanIfMissing(raw) { appendLog(it) }
+                    val ok = MalPipeline.processEntry(baseDir, enriched, customTags) { appendLog(it) }
+                    appendLog("Saved ${enriched.title}: ${if (ok) "OK" else "Fallback poster"}")
                 }
-                appendLog("Done")
+
+                appendLog("MAL XML successfully processed — ${entries.size} series generated.")
             } catch (e: Exception) {
-                appendLog("Error: ${e.message}")
+                appendLog("Critical Error: ${e.localizedMessage}")
             } finally {
                 _ui.value = uiState.copy(isProcessing = false)
             }
