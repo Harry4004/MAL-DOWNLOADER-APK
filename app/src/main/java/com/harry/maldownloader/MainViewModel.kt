@@ -80,7 +80,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     appendLog("Saved ${enriched.title}: ${if (ok) "OK" else "Fallback poster"}")
                 }
 
-                appendLog("MAL XML successfully processed — ${entries.size} series generated.")
+                appendLog("MAL XML successfully processed 2${entries.size}2 series generated.")
             } catch (e: Exception) {
                 appendLog("Critical Error: ${e.localizedMessage}")
             } finally {
