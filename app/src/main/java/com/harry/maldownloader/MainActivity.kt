@@ -1,119 +1,89 @@
 package com.harry.maldownloader
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
-import android.util.Log
+import android.provider.OpenableColumns
 import android.widget.Button
-import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var logTextView: TextView
-    private lateinit var logScrollView: ScrollView
-    private lateinit var startButton: Button
-
-    // TODO: Replace this placeholder with your actual MAL API client ID string
-    private val clientId = "aaf018d4c098158bd890089f32125add"
+    private lateinit var logView: TextView
+    private lateinit var selectFileBtn: Button
+    private lateinit var downloadBtn: Button
+    private var selectedFileUri: Uri? = null
+    private lateinit var malPipeline: MalPipeline
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        logTextView = findViewById(R.id.logTextView)
-        logScrollView = findViewById(R.id.logScrollView)
-        startButton = findViewById(R.id.startButton)
+        logView = findViewById(R.id.logView)
+        selectFileBtn = findViewById(R.id.selectFileBtn)
+        downloadBtn = findViewById(R.id.downloadBtn)
+        malPipeline = MalPipeline(this) { log(it) }
 
-        startButton.setOnClickListener {
-            checkPermissionsAndStart()
-        }
+        checkPermissions()
 
-        // Setup ViewModel and observe UI state
-        viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
-        viewModel.uiState.observe(this) { ui ->
-            startButton.isEnabled = !ui.isProcessing
-            logTextView.text = ui.logs.joinToString("\n")
-            logScrollView.post { logScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
-        }
-    }
-
-    private lateinit var viewModel: MainViewModel
-
-    private fun checkPermissionsAndStart() {
-        when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED -> {
-                startProcessing()
-            }
-            else -> {
-                requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-    }
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            startProcessing()
-        } else {
-            Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun startProcessing() {
-        logTextView.text = ""  // Reset logs
-
-        val xmlFile = File(getExternalFilesDir(null), "myanimelist_export.xml")
-        if (!xmlFile.exists()) {
-            appendLog("Error: MAL export XML file not found at ${xmlFile.absolutePath}")
-            return
-        }
-
-        appendLog("Parsing MAL XML...")
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val entries = MalParser.parse(xmlFile)
-                appendLog("Found ${entries.size} entries.")
-
-                entries.forEach { entry ->
-                    appendLog("Fetching image for: ${entry.title}")
-
-                    val imageUrl = Downloader.fetchAnimeImage(entry.id, clientId)
-                    if (imageUrl != null) {
-                        appendLog("Downloading image: $imageUrl")
-                        val picturesDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-                        val cleanTitle = entry.title.replace("[^a-zA-Z0-9 ]".toRegex(), "_")
-                        val saveFile = File(picturesDir, "$cleanTitle.jpg")
-                        Downloader.downloadImage(imageUrl, saveFile)
-                        appendLog("Saved image to ${saveFile.absolutePath}")
-                    } else {
-                        appendLog("Image not found for ${entry.title}")
-                    }
+        val filePicker =
+            registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+                uri?.let {
+                    selectedFileUri = it
+                    val fileName = getFileNameFromUri(it)
+                    log("Selected file: $fileName")
                 }
-
-                appendLog("Done processing all entries.")
-            } catch (e: Exception) {
-                appendLog("Error during processing: ${e.message}")
-                Log.e("MALDownloader", "Error", e)
             }
+
+        selectFileBtn.setOnClickListener {
+            filePicker.launch("*/*")
+        }
+
+        downloadBtn.setOnClickListener {
+            selectedFileUri?.let { uri ->
+                lifecycleScope.launch {
+                    log("Parsing MAL XML file...")
+                    malPipeline.processMalFile(uri)
+                    log("Done.")
+                }
+            } ?: log("Please select a MAL XML file first.")
         }
     }
 
-    private suspend fun appendLog(text: String) = withContext(Dispatchers.Main) {
-        logTextView.append(text + "\n")
-        logScrollView.post { logScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+    private fun checkPermissions() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                1
+            )
+        }
     }
 
+    private fun getFileNameFromUri(uri: Uri): String {
+        var name = "unknown.xml"
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst() && nameIndex != -1) {
+                name = cursor.getString(nameIndex)
+            }
+        }
+        return name
+    }
+
+    private fun log(msg: String) {
+        logView.append("$msg\n")
+    }
 }
