@@ -84,6 +84,12 @@ dependencies {
     // WorkManager for background downloads
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
     
+    // DataStore for settings persistence
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
+    
+    // JSON parsing
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
     // Testing dependencies
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
