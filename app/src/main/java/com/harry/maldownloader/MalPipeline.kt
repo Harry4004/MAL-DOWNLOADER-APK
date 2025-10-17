@@ -8,7 +8,6 @@ import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
-import java.text.Normalizer
 
 class MalPipeline(private val context: Context, private val onLog: (String) -> Unit) {
 
@@ -72,37 +71,38 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
                             "my_status" -> if (insideAnime) status = parser.nextText()
                             "my_tags", "mytags" -> if (insideAnime) tags = parser.nextText()
                             "my_comments", "comments" -> if (insideAnime) comments = parser.nextText()
-                    }
-                    XmlPullParser.END_TAG -> if (insideAnime && parser.name?.lowercase() == "anime") {
-                        if (title.isNotEmpty()) {
-                            entries.add(
-                                com.harry.maldownloader.data.AnimeEntry(
-                                    seriesId = seriesId,
-                                    title = title,
-                                    type = type,
-                                    episodesTotal = episodesTotal,
-                                    userId = userId,
-                                    episodesWatched = episodesWatched,
-                                    startDate = startDate,
-                                    finishDate = finishDate,
-                                    userScore = userScore,
-                                    dvd = null,
-                                    storage = null,
-                                    status = status,
-                                    comments = comments,
-                                    timesWatched = null,
-                                    rewatchValue = null,
-                                    tags = tags,
-                                    rewatching = false,
-                                    rewatchingEp = null,
-                                    imagePath = null
-                                )
-                            )
                         }
-                        insideAnime = false
+                        XmlPullParser.END_TAG -> if (insideAnime && parser.name?.lowercase() == "anime") {
+                            if (title.isNotEmpty()) {
+                                entries.add(
+                                    AnimeEntry(
+                                        seriesId = seriesId,
+                                        title = title,
+                                        type = type,
+                                        episodesTotal = episodesTotal,
+                                        userId = userId,
+                                        episodesWatched = episodesWatched,
+                                        startDate = startDate,
+                                        finishDate = finishDate,
+                                        userScore = userScore,
+                                        dvd = null,
+                                        storage = null,
+                                        status = status,
+                                        comments = comments,
+                                        timesWatched = null,
+                                        rewatchValue = null,
+                                        tags = tags,
+                                        rewatching = false,
+                                        rewatchingEp = null,
+                                        imagePath = null
+                                    )
+                                )
+                            }
+                            insideAnime = false
+                        }
                     }
+                    event = parser.next()
                 }
-                event = parser.next()
             }
         } catch (e: Exception) {
             onLog("Error parsing XML: ${e.message}")
