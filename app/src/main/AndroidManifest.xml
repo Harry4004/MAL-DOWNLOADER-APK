@@ -1,17 +1,23 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissions for network and storage -->
+    <!-- Permissions for network (Jikan API) and storage (XML file access; images saved internally) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />  <!-- Added: For monitoring API connectivity -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" /> <!-- Added for local image saves/exports if needed; internal storage used by default -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />  <!-- For XML reads/writes; internal for images/DB -->
 
-    <!-- Query for file picker on Android 13+ to access XML files without full storage access -->
+    <!-- Query for file picker on Android 13+ to access XML without full storage access -->
     <queries>
         <intent>
             <action android:name="android.intent.action.GET_CONTENT" />
             <data android:mimeType="application/xml" />
+            <data android:mimeType="*/*" />  <!-- Fallback for any file, but prefers XML -->
         </intent>
     </queries>
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />  <!-- Optional: Ensures touch UI compatibility -->
 
     <application
         android:allowBackup="true"
@@ -19,13 +25,16 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="MAL Downloader"
-        android:theme="@style/Theme.MALDownloader"  <!-- Added: References dark theme setup from res/values/themes.xml -->
+        android:theme="@style/Theme.MALDownloader"  <!-- Dark theme for black/grey UI with tag colors -->
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"  <!-- Added: If any HTTP fallbacks needed; remove if all HTTPS -->
         tools:targetApi="31">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MALDownloader">  <!-- Added: Ensures dark theme applies to activity -->
+            android:theme="@style/Theme.MALDownloader"
+            android:screenOrientation="portrait">  <!-- Optional: Portrait for mobile-only development -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
