@@ -1,29 +1,23 @@
 package com.harry.maldownloader
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.harry.maldownloader.adapter.AnimeAdapter
 import com.harry.maldownloader.data.AnimeEntry
-import com.harry.maldownloader.pipeline.MalPipeline
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import android.widget.ScrollView
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,25 +25,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var selectFileBtn: Button
     private lateinit var downloadBtn: Button
     private lateinit var recyclerView: RecyclerView
-    private lateinit var scrollView: ScrollView  // For auto-scroll logs
+    private lateinit var scrollView: ScrollView
     private var selectedFileUri: Uri? = null
     private lateinit var malPipeline: MalPipeline
     private lateinit var animeAdapter: AnimeAdapter
     private val entries: MutableList<AnimeEntry> = mutableListOf()
 
+    private val uiScope = CoroutineScope(Dispatchers.Main + Job())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)  // Force dark theme
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         setContentView(R.layout.activity_main)
 
         logView = findViewById(R.id.logView)
         selectFileBtn = findViewById(R.id.selectFileBtn)
         downloadBtn = findViewById(R.id.downloadBtn)
         recyclerView = findViewById(R.id.animeListRecycler)
-        scrollView = findViewById(R.id.logScrollView)  // Assume added in layout
+        scrollView = findViewById(R.id.logScrollView)
         malPipeline = MalPipeline(this) { log(it) }
-
-        checkPermissions()
 
         // Setup RecyclerView
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -73,32 +67,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        selectFileBtn.setOnClickListener {
-            filePicker.launch("application/xml")  // Prefer XML files
-        }
+        selectFileBtn.setOnClickListener { filePicker.launch("application/xml") }
 
         downloadBtn.setOnClickListener {
             selectedFileUri?.let { uri ->
-                lifecycleScope.launch {
+                uiScope.launch {
                     log("Parsing MAL XML file...")
                     entries.clear()
                     val processedEntries = malPipeline.processMalFile(uri)
                     entries.addAll(processedEntries)
                     animeAdapter.notifyDataSetChanged()
                     recyclerView.visibility = View.VISIBLE
-                    log("Done. Displayed ${entries.size} anime entries with images and editable tags.")
+                    log("Done. Displayed ${entries.size} anime entries.")
                 }
             } ?: log("Please select a MAL XML file first.")
-        }
-    }
-
-    private fun checkPermissions() {
-        val permissions = arrayOf(
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        )
-        if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
-            ActivityCompat.requestPermissions(this, permissions, 1)
         }
     }
 
@@ -114,24 +96,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun log(msg: String) {
-        Log.d("MALDownloader", msg)  // For Logcat debugging
         runOnUiThread {
             logView.append("$msg\n")
-            // Auto-scroll to bottom
-            scrollView.post {
-                scrollView.fullScroll(View.FOCUS_DOWN)
-            }
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1) {
-            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                log("Permissions granted.")
-            } else {
-                log("Permissions denied. File access limited.")
-            }
+            scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
         }
     }
 }
