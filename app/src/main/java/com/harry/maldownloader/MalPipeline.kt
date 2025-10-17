@@ -16,11 +16,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.nio.charset.Charset
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
 
-// Enhanced MAL entry fields for real export
+// Data classes defining MAL entries and embedded metadata of images
 data class MalEntry(
     val title: String,
     val imageUrl: String?,
@@ -38,7 +37,6 @@ data class EmbeddedMeta(
 )
 
 object MalPipeline {
-    // Retrofit Api interface for Jikan
     interface JikanApi {
         @GET("anime")
         suspend fun searchAnime(@Query("q") q: String, @Query("limit") limit: Int = 3): AnimeSearchResponse
@@ -54,7 +52,6 @@ object MalPipeline {
     )
     data class JikanGenre(val name: String)
 
-    // Retrofit client
     private val httpClient = OkHttpClient.Builder()
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
@@ -65,10 +62,11 @@ object MalPipeline {
         .client(httpClient)
         .build()
 
-    fun parseMalDataFile(context: Context, filePath: String, onLog: ((String)->Unit)? = null): List<MalEntry> {
+    fun parseMalDataFile(context: Context, filePath: String, onLog: ((String) -> Unit)? = null): List<MalEntry> {
         val out = mutableListOf<MalEntry>()
         try {
             val fis = java.io.FileInputStream(filePath)
+            onLog?.invoke("Opened file '$filePath', size=${fis.available()} bytes")
             val factory = XmlPullParserFactory.newInstance()
             val parser = factory.newPullParser()
             parser.setInput(fis, null)
@@ -83,61 +81,101 @@ object MalPipeline {
             var score: String? = null
             var blockCount = 0
 
-            onLog?.invoke("Parsing MAL XML...")
+            onLog?.invoke("Starting MAL XML parsing loop...")
             while (event != XmlPullParser.END_DOCUMENT) {
                 when (event) {
-                    XmlPullParser.START_TAG -> when (parser.name.lowercase()) {
-                        "anime" -> {
-                            insideAnime = true
-                            title = null
-                            imageUrl = null
-                            desc = null
-                            tags = mutableListOf()
-                            animeId = null
-                            score = null
+                    XmlPullParser.START_TAG -> {
+                        onLog?.invoke("Start tag: ${parser.name}")
+                        when (parser.name.lowercase()) {
+                            "anime" -> {
+                                insideAnime = true
+                                title = null
+                                imageUrl = null
+                                desc = null
+                                tags = mutableListOf()
+                                animeId = null
+                                score = null
+                                onLog?.invoke("New anime record started.")
+                            }
+                            "seriestitle" -> if (insideAnime) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found title: $text")
+                                title = text
+                            }
+                            "seriesimage" -> if (insideAnime) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found image url: $text")
+                                imageUrl = text
+                            }
+                            "series_synopsis" -> if (insideAnime) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found description.")
+                                desc = text
+                            }
+                            "mytags" -> if (insideAnime) {
+                                val tagCsv = parser.nextText()
+                                if (tagCsv.isNotBlank()) {
+                                    onLog?.invoke("Found custom tags: $tagCsv")
+                                    tags.addAll(tagCsv.split(",", ";", " ").map { it.trim() }.filter { it.isNotBlank() })
+                                }
+                            }
+                            "series_animedbid" -> if (insideAnime) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found MAL ID: $text")
+                                animeId = text
+                            }
+                            "myscore" -> if (insideAnime) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found score: $text")
+                                score = text
+                            }
+                            // Fallbacks:
+                            "seriesimageurl", "image", "image_url", "poster", "cover" -> if (insideAnime && imageUrl == null) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found fallback image url: $text")
+                                imageUrl = text
+                            }
+                            "synopsis", "description" -> if (insideAnime && desc == null) {
+                                val text = parser.nextText()
+                                onLog?.invoke("Found fallback description.")
+                                desc = text
+                            }
                         }
-                        "seriestitle" -> if (insideAnime) title = parser.nextText()
-                        "seriesimage" -> if (insideAnime) imageUrl = parser.nextText()
-                        "series_synopsis" -> if (insideAnime) desc = parser.nextText()
-                        "mytags" -> if (insideAnime) {
-                            val tagCsv = parser.nextText()
-                            if (tagCsv.isNotBlank()) tags.addAll(tagCsv.split(",",";"," "))
-                        }
-                        "series_animedbid" -> if (insideAnime) animeId = parser.nextText()
-                        "myscore" -> if (insideAnime) score = parser.nextText()
-                        // Fallbacks:
-                        "seriesimageurl", "image", "image_url", "poster", "cover" -> if (insideAnime && imageUrl==null) imageUrl = parser.nextText()
-                        "synopsis", "description" -> if (insideAnime && desc==null) desc = parser.nextText()
                     }
-                    XmlPullParser.END_TAG -> if (insideAnime && parser.name.lowercase() == "anime") {
-                        if (!title.isNullOrBlank()) {
-                            blockCount++
-                            onLog?.invoke("Parsed: #$blockCount $title")
-                            out.add(
-                                MalEntry(
-                                    title = title!!.trim(),
-                                    imageUrl = imageUrl,
-                                    description = desc,
-                                    tags = tags.filter { it.isNotBlank() },
-                                    animeId = animeId,
-                                    score = score
+                    XmlPullParser.END_TAG -> {
+                        if (insideAnime && parser.name.lowercase() == "anime") {
+                            if (!title.isNullOrBlank()) {
+                                blockCount++
+                                onLog?.invoke("Completed anime record #$blockCount: $title")
+                                out.add(
+                                    MalEntry(
+                                        title = title!!.trim(),
+                                        imageUrl = imageUrl,
+                                        description = desc,
+                                        tags = tags.filter { it.isNotBlank() },
+                                        animeId = animeId,
+                                        score = score
+                                    )
                                 )
-                            )
+                            } else {
+                                onLog?.invoke("Anime record skipped due to empty title.")
+                            }
+                            insideAnime = false
                         }
-                        insideAnime = false
                     }
                 }
                 event = parser.next()
             }
             fis.close()
-            onLog?.invoke("Found ${out.size} anime entries (MAL export)")
+            onLog?.invoke("Parsing complete. Total entries found: ${out.size}.")
         } catch (e: Exception) {
             onLog?.invoke("[Error parsing XML] ${e.localizedMessage}")
         }
         return out
     }
 
-    suspend fun enrichFromJikanIfMissing(entry: MalEntry): MalEntry {
+    suspend fun enrichFromJikanIfMissing(entry: MalEntry, onLog: ((String) -> Unit)? = null): MalEntry {
+        onLog?.invoke("Enriching ${entry.title} from Jikan API...")
         val api = retrofit.create(JikanApi::class.java)
         return try {
             val resp = api.searchAnime(entry.title, 3)
@@ -147,24 +185,31 @@ object MalPipeline {
                     ?: best.images?.get("webp")?.get("image_url"))
                 val desc = if (entry.description.isNullOrBlank()) best.synopsis else entry.description
                 val extraTags = best.genres?.mapNotNull { it.name } ?: emptyList()
+                onLog?.invoke("Enrichment fetched for ${entry.title}")
                 entry.copy(
                     imageUrl = poster,
                     description = desc,
                     tags = (entry.tags + extraTags).distinct()
                 )
-            } else entry
-        } catch (_: Exception) {
+            } else {
+                onLog?.invoke("No enrichment found for ${entry.title}")
+                entry
+            }
+        } catch (ex: Exception) {
+            onLog?.invoke("Error enriching ${entry.title}: ${ex.localizedMessage}")
             entry
         }
     }
 
-    suspend fun processEntry(root: File, entry: MalEntry, userCustomTags: List<String>): Boolean =
+    suspend fun processEntry(root: File, entry: MalEntry, userCustomTags: List<String>, onLog: ((String) -> Unit)? = null): Boolean =
         withContext(Dispatchers.IO) {
+            onLog?.invoke("Processing entry ${entry.title}...")
             val (imageFile, metaFile) = buildOutputPaths(root, entry.title)
             val tags = enrichTags(entry.tags, entry.title, entry.description, userCustomTags)
-            val ok = ensureImageWithAllFallbacks(entry, imageFile)
+            val ok = ensureImageWithAllFallbacks(entry, imageFile, onLog)
             embedMetadataIntoImage(imageFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
             writeMetaJson(metaFile, EmbeddedMeta(entry.title, entry.description, tags, "MAL"))
+            onLog?.invoke("Entry processed: ${entry.title} -> ${if (ok) "OK" else "Placeholder"}")
             return@withContext ok
         }
 
@@ -199,10 +244,12 @@ object MalPipeline {
         .replace("\n", "\\n")
         .replace("\r", "\\r") + "\""
 
-    private suspend fun ensureImageWithAllFallbacks(entry: MalEntry, outFile: File): Boolean {
-        if (downloadImageWithRetries(entry.imageUrl, outFile)) return true
+    private suspend fun ensureImageWithAllFallbacks(entry: MalEntry, outFile: File, onLog: ((String) -> Unit)? = null): Boolean {
+        onLog?.invoke("Downloading image: ${entry.imageUrl}")
+        if (downloadImageWithRetries(entry.imageUrl, outFile, onLog)) return true
         val fb = findImageUrlFallback(entry.title)
-        if (downloadImageWithRetries(fb, outFile)) return true
+        if (downloadImageWithRetries(fb, outFile, onLog)) return true
+        onLog?.invoke("Failed to download image, writing placeholder")
         return writeTinyPlaceholderPng(outFile)
     }
 
@@ -211,12 +258,14 @@ object MalPipeline {
         outFile: File,
         maxRetries: Int = 4,
         connectTimeoutMs: Int = 8000,
-        readTimeoutMs: Int = 12000
+        readTimeoutMs: Int = 12000,
+        onLog: ((String) -> Unit)? = null
     ): Boolean = withContext(Dispatchers.IO) {
         if (imageUrl.isNullOrBlank()) return@withContext false
         var attempt = 0
         while (attempt < maxRetries) {
             try {
+                onLog?.invoke("Attempt ${attempt + 1} to download image")
                 val url = URL(imageUrl)
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
@@ -227,8 +276,10 @@ object MalPipeline {
                 conn.inputStream.use { input ->
                     outFile.outputStream().use { output -> input.copyTo(output) }
                 }
+                onLog?.invoke("Successfully downloaded image")
                 return@withContext true
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                onLog?.invoke("Error downloading image: ${e.localizedMessage}")
                 attempt++
             }
         }
@@ -252,7 +303,9 @@ object MalPipeline {
             }
             bmp.recycle()
             true
-        } catch (_: Exception) { false }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private suspend fun findImageUrlFallback(title: String): String? = withContext(Dispatchers.IO) {
@@ -287,7 +340,9 @@ object MalPipeline {
                 val match = regex.find(json)
                 match?.groupValues?.get(1)?.replace("\\/", "/")
             } else null
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun enrichTags(originalTags: List<String>, title: String, description: String?, customTags: List<String>): List<String> {
