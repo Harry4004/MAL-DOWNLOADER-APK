@@ -39,6 +39,9 @@ jobs:
           unzip -q gradle-install.zip -d /tmp/gradle8
           /tmp/gradle8/gradle-8.7/bin/gradle wrapper --gradle-version 8.7
         fi
+
+    - name: Wipe Gradle caches (one-time unblock)
+      run: rm -rf ~/.gradle/caches ~/.gradle/kotlin ~/.m2/repository || true
       
     - name: Force clean to pick up Kotlin 1.9.25
       run: ./gradlew --no-daemon clean
