@@ -7,15 +7,23 @@
     android:background="#121212">
 
     <Button
-        android:id="@+id/startButton"
+        android:id="@+id/selectFileBtn"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Processing"
+        android:text="Select MAL XML File"
         android:backgroundTint="#BB86FC"
-        android:textColor="#FFFFFF" />
+        android:textColor="#FFFFFF"/>
+
+    <Button
+        android:id="@+id/downloadBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Download Images"
+        android:backgroundTint="#BB86FC"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="8dp"/>
 
     <ScrollView
-        android:id="@+id/logScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -24,7 +32,7 @@
         android:layout_marginTop="16dp">
 
         <TextView
-            android:id="@+id/logTextView"
+            android:id="@+id/logView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
