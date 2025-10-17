@@ -4,7 +4,7 @@ import android.content.Context
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -36,7 +36,7 @@ fun provideMalApiService(): MalApiService {
 
     val retrofit = Retrofit.Builder()
         .baseUrl("https://api.myanimelist.net/v2/")
-        .addConverterFactory(MoshiConverterFactory.create())
+        .addConverterFactory(GsonConverterFactory.create())
         .client(client)
         .build()
 
