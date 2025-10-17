@@ -2,6 +2,8 @@ package com.harry.maldownloader
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,25 +16,37 @@ data class UiState(
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    private val _ui = androidx.compose.runtime.mutableStateOf(UiState())
-    val uiState get() = _ui.value
+    
+    private val _ui = MutableLiveData(UiState())
+    val uiState: LiveData<UiState> get() = _ui
+
+    private fun updateUi(update: UiState.() -> UiState) {
+        val current = _ui.value ?: UiState()
+        _ui.postValue(current.update())
+    }
 
     fun setCustomTags(csv: String) {
-        _ui.value = uiState.copy(customTagsCsv = csv)
+        updateUi {
+            copy(customTagsCsv = csv)
+        }
     }
 
     fun appendLog(msg: String) {
-        _ui.value = uiState.copy(logs = uiState.logs + msg)
+        updateUi {
+            copy(logs = logs + msg)
+        }
     }
 
     fun clearLogs() {
-        _ui.value = uiState.copy(logs = emptyList())
+        updateUi {
+            copy(logs = emptyList())
+        }
     }
 
     fun onMalFilePicked(path: String, baseDir: File) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                _ui.value = uiState.copy(isProcessing = true)
+                updateUi { copy(isProcessing = true) }
                 appendLog("Opening MAL file: $path")
 
                 val file = File(path)
@@ -48,7 +62,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 appendLog("File preview (first 20 lines):\n$preview")
 
                 appendLog("Parsing MAL XML file...")
-                val entries = MalPipeline.parseMalDataFile(getApplication(), path) { log -> appendLog(log) }
+                val entries = MalPipeline.parseMalDataFile(getApplication(), path) { appendLog(it) }
                 appendLog("Parsed entries count: ${entries.size}")
 
                 if (entries.isEmpty()) {
@@ -56,7 +70,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
-                val customTags = uiState.customTagsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                val customTags = _ui.value?.customTagsCsv?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                    ?: emptyList()
 
                 for ((idx, raw) in entries.withIndex()) {
                     appendLog("Enriching entry [${idx + 1}/${entries.size}]: ${raw.title}")
@@ -69,7 +84,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 appendLog("Critical Error: ${e.localizedMessage}")
             } finally {
-                _ui.value = uiState.copy(isProcessing = false)
+                updateUi { copy(isProcessing = false) }
             }
         }
     }
