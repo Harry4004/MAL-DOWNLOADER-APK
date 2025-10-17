@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.MALDownloader" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#BB86FC</item>
+        <item name="colorOnPrimary">#000000</item>
+        <item name="colorPrimaryContainer">#3700B3</item>
+        <item name="colorOnPrimaryContainer">#EADDFF</item>
+        <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimary</item>
+    </style>
+</resources>
