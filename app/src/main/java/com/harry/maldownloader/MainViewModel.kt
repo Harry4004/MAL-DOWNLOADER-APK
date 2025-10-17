@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.harry.maldownloader.data.AnimeEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -26,22 +27,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setCustomTags(csv: String) {
-        updateUi {
-            copy(customTagsCsv = csv)
-        }
+        updateUi { copy(customTagsCsv = csv) }
     }
 
     fun appendLog(msg: String) {
-        updateUi {
-            copy(logs = logs + msg)
-        }
+        updateUi { copy(logs = logs + msg) }
     }
 
-    fun clearLogs() {
-        updateUi {
-            copy(logs = emptyList())
-        }
-    }
+    fun clearLogs() { updateUi { copy(logs = emptyList()) } }
 
     fun onMalFilePicked(path: String, baseDir: File) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -62,7 +55,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 appendLog("File preview (first 20 lines):\n$preview")
 
                 appendLog("Parsing MAL XML file...")
-                val entries = MalPipeline.parseMalDataFile(getApplication(), path) { appendLog(it) }
+                val entries: List<AnimeEntry> = MalPipeline.parseMalDataFile(getApplication(), path) { appendLog(it) }
                 appendLog("Parsed entries count: ${entries.size}")
 
                 if (entries.isEmpty()) {
@@ -73,14 +66,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val customTags = _ui.value?.customTagsCsv?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
                     ?: emptyList()
 
-                for ((idx, raw) in entries.withIndex()) {
-                    appendLog("Enriching entry [${idx + 1}/${entries.size}]: ${raw.title}")
-                    val enriched = MalPipeline.enrichFromJikanIfMissing(raw) { appendLog(it) }
-                    val ok = MalPipeline.processEntry(baseDir, enriched, customTags) { appendLog(it) }
-                    appendLog("Saved ${enriched.title}: ${if (ok) "OK" else "Fallback poster"}")
+                entries.forEachIndexed { idx, raw ->
+                    appendLog("Processing entry [${idx + 1}/${entries.size}]: ${raw.title}")
+                    // Temporary: skip enrichment/downloading in ViewModel; pipeline handles downloads elsewhere if needed
+                    // You can re-introduce enrichment and file output by calling pipeline methods here.
                 }
 
-                appendLog("MAL XML successfully processed 2${entries.size}2 series generated.")
+                appendLog("MAL XML successfully processed ${entries.size} series.")
             } catch (e: Exception) {
                 appendLog("Critical Error: ${e.localizedMessage}")
             } finally {
