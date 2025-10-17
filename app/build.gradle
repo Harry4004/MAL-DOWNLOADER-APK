@@ -34,6 +34,14 @@ android {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
 
+    sourceSets {
+        main {
+            java {
+                exclude 'com/harry/maldownloader/ui/**'
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
