@@ -3,6 +3,7 @@ package com.harry.maldownloader.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -37,37 +38,41 @@ class AnimeAdapter(
         holder.statusText.text = entry.status ?: "Unknown"
         holder.episodesText.text = "${entry.episodesWatched ?: 0}/${entry.episodesTotal ?: 0} eps"
         
-        // Load image with Coil (fallback to placeholder if path invalid)
-        holder.imageView.load(entry.imagePath) {
-            placeholder(R.drawable.ic_placeholder)  // Add a simple drawable if needed
-            error(R.drawable.ic_error)  // Or generated placeholder
-        }
+        // Load image with Coil (no placeholder/error drawables to avoid missing resource errors)
+        holder.imageView.load(entry.imagePath)
         
         // Populate tags as chips
         holder.tagGroup.removeAllViews()
         entry.tags?.split(",")?.forEach { tag ->
-            val chip = Chip(holder.tagGroup.context).apply {
-                text = tag.trim()
-                isCloseIconVisible = true
-                setOnCloseIconClickListener { 
-                    // Remove tag logic here, then notify
-                    onTagEdit(position, getUpdatedTags(position, tag))
+            val trimmedTag = tag.trim()
+            if (trimmedTag.isNotEmpty()) {
+                val chip = Chip(holder.tagGroup.context).apply {
+                    text = trimmedTag
+                    isCloseIconVisible = true
+                    setOnCloseIconClickListener { 
+                        // Remove tag logic
+                        val updatedTags = getUpdatedTags(position, trimmedTag)
+                        onTagEdit(position, updatedTags)
+                    }
                 }
+                holder.tagGroup.addView(chip)
             }
-            holder.tagGroup.addView(chip)
         }
         
         holder.itemView.setOnLongClickListener {
-            showTagEditDialog(position, entry.tags ?: "")
+            showTagEditDialog(holder.itemView.context, position, entry.tags ?: "")
             true
         }
     }
 
     override fun getItemCount() = entries.size
 
-    private fun showTagEditDialog(position: Int, currentTags: String) {
-        val context = entries[0].let { /* dummy */ }  // Use adapter context
-        val input = android.widget.EditText(context).apply { setText(currentTags) }
+    private fun showTagEditDialog(context: android.content.Context, position: Int, currentTags: String) {
+        val input = EditText(context).apply { 
+            setText(currentTags)
+            hint = "Enter tags separated by commas"
+        }
+        
         AlertDialog.Builder(context)
             .setTitle("Edit Tags (comma-separated)")
             .setView(input)
@@ -75,15 +80,15 @@ class AnimeAdapter(
                 val newTags = input.text.toString()
                 entries[position] = entries[position].copy(tags = newTags)
                 notifyItemChanged(position)
-                onTagEdit(position, newTags.split(","))
+                val tagList = newTags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                onTagEdit(position, tagList)
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
     private fun getUpdatedTags(position: Int, removedTag: String): List<String> {
-        // Implement removal logic
         val tags = entries[position].tags?.split(",") ?: emptyList()
-        return tags.filter { it.trim() != removedTag.trim() }.joinToString(",")
+        return tags.map { it.trim() }.filter { it != removedTag.trim() && it.isNotEmpty() }
     }
 }
