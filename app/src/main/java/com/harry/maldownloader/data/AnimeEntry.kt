@@ -18,5 +18,6 @@ data class AnimeEntry(
     val rewatchValue: String?,
     val tags: String?,
     val rewatching: Boolean?,
-    val rewatchingEp: Int?
+    val rewatchingEp: Int?,
+    val imagePath: String? = null  // Local path to downloaded image
 )
