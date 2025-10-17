@@ -20,9 +20,16 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: 'gradle'
-        
+        check-latest: true
+
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
+      with:
+        cache-read-only: false
+        gradle-home-cache-cleanup: true
+
+    - name: Force clean to pick up Kotlin 1.9.25
+      run: ./gradlew --no-daemon clean
 
     - name: Generate wrapper (if missing)
       run: |
@@ -37,6 +44,8 @@ jobs:
       run: chmod +x gradlew
       
     - name: Build debug APK
+      env:
+        ORG_GRADLE_PROJECT_kotlinVersion: 1.9.25
       run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
       
     - name: Upload APK artifact
