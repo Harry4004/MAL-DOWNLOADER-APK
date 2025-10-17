@@ -1,3 +1,5 @@
+package com.harry.maldownloader.data
+
 data class AnimeEntry(
     val seriesId: Int,
     val title: String,
