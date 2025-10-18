@@ -85,7 +85,7 @@ class DownloadRepository(val context: Context, private val database: DownloadDat
             .addTag("download_$downloadId")
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
-                OneTimeWorkRequest.MIN_BACKOFF_MILLIS,
+                15000, //OneTimeWorkRequest.MIN_BACKOFF_MILLIS,
                 TimeUnit.MILLISECONDS
             )
             .build()
