@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -19,12 +20,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
+        android:name=".MainApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="MAL Downloader"
         android:theme="@style/Theme.MALDownloader"
         android:supportsRtl="true"
-        android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true">
 
         <activity
@@ -37,12 +38,10 @@
             </intent-filter>
         </activity>
         
-        <!-- Download service for background processing -->
-        <service
-            android:name=".download.DownloadService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+        <!-- Download cancel receiver -->
+        <receiver
+            android:name=".downloader.DownloadCancelReceiver"
+            android:exported="false" />
         
         <!-- WorkManager for download queue -->
         <provider
