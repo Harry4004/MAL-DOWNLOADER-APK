@@ -217,7 +217,8 @@ class DownloadRepository(val context: Context, private val database: DownloadDat
 
     suspend fun cleanup() {
         val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000)
-        downloadDao.cleanupOldCompleted(oneWeekAgo)
+        // Temporarily commented out until we fix the database schema
+        // downloadDao.cleanupOldCompleted(oneWeekAgo)
         logDao.cleanupOldLogs(oneWeekAgo)
     }
 }
