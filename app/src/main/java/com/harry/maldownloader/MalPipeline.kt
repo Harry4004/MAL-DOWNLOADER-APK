@@ -46,18 +46,23 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
                 var insideEntry = false
                 var entryTagName = "anime" // also allow "manga"
 
-                var seriesId = 0
+                // Variables matching the NEW AnimeEntry data class
+                var seriesId = ""
                 var title = ""
-                var type: String? = null
-                var episodesTotal: Int? = null
-                var userId: Int? = null
-                var episodesWatched: Int? = null
-                var startDate: String? = null
-                var finishDate: String? = null
-                var userScore: Int? = null
+                var type = ""
+                var episodesWatched = 0
+                var totalEpisodes: Int? = null
+                var userScore = 0
                 var status: String? = null
+                var startDate: String? = null
+                var endDate: String? = null
                 var tags: String? = null
-                var comments: String? = null
+                var imageUrl: String? = null
+                var malUrl: String? = null
+                var synopsis: String? = null
+                var genres: String? = null
+                var studio: String? = null
+                var source: String? = null
 
                 onLog("Starting XML parsing...")
                 while (event != XmlPullParser.END_DOCUMENT) {
@@ -72,58 +77,65 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
                                 "anime", "manga" -> {
                                     insideEntry = true
                                     entryTagName = n
-                                    seriesId = 0; title = ""; type = null; episodesTotal = null; userId = null
-                                    episodesWatched = null; startDate = null; finishDate = null; userScore = null
-                                    status = null; tags = null; comments = null
+                                    // Reset all variables
+                                    seriesId = ""; title = ""; type = ""; episodesWatched = 0; totalEpisodes = null
+                                    userScore = 0; status = null; startDate = null; endDate = null; tags = null
+                                    imageUrl = null; malUrl = null; synopsis = null; genres = null; studio = null; source = null
                                 }
                                 // ID variants
-                                "series_animedb_id", "series_animedbid" -> if (insideEntry) seriesId = parser.nextText().toIntOrNull() ?: 0
+                                "series_animedb_id", "series_animedbid" -> if (insideEntry) seriesId = parser.nextText().trim()
                                 // Title variants
                                 "series_title", "seriestitle" -> if (insideEntry) title = parser.nextText().trim()
-                                // Other standard fields
-                                "series_type" -> if (insideEntry) type = parser.nextText()
-                                "series_episodes" -> if (insideEntry) episodesTotal = parser.nextText().toIntOrNull()
-                                "my_id" -> if (insideEntry) userId = parser.nextText().toIntOrNull()
-                                "my_watched_episodes" -> if (insideEntry) episodesWatched = parser.nextText().toIntOrNull()
-                                "my_start_date" -> if (insideEntry) startDate = parser.nextText()
-                                "my_finish_date" -> if (insideEntry) finishDate = parser.nextText()
-                                "my_score" -> if (insideEntry) userScore = parser.nextText().toIntOrNull()
-                                "my_status" -> if (insideEntry) status = parser.nextText()
-                                // Tags/comments variants
-                                "my_tags", "mytags" -> if (insideEntry) tags = parser.nextText()
-                                "my_comments", "comments" -> if (insideEntry) comments = parser.nextText()
-                                else -> { /* ignore other tags */ }
+                                // Type
+                                "series_type" -> if (insideEntry) type = parser.nextText().trim()
+                                // Episodes
+                                "series_episodes" -> if (insideEntry) totalEpisodes = parser.nextText().toIntOrNull()
+                                "my_watched_episodes" -> if (insideEntry) episodesWatched = parser.nextText().toIntOrNull() ?: 0
+                                // Dates
+                                "my_start_date" -> if (insideEntry) startDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "my_finish_date" -> if (insideEntry) endDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                // Score
+                                "my_score" -> if (insideEntry) userScore = parser.nextText().toIntOrNull() ?: 0
+                                // Status
+                                "my_status" -> if (insideEntry) status = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                // Tags
+                                "my_tags", "mytags" -> if (insideEntry) tags = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                // Additional fields that might be in XML
+                                "series_image" -> if (insideEntry) imageUrl = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "series_synopsis" -> if (insideEntry) synopsis = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "series_genre" -> if (insideEntry) genres = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "series_studio" -> if (insideEntry) studio = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "series_source" -> if (insideEntry) source = parser.nextText().trim().takeIf { it.isNotEmpty() }
                             }
                         }
                         XmlPullParser.END_TAG -> {
                             val n = parser.name?.lowercase() ?: ""
                             if (insideEntry && (n == entryTagName)) {
-                                if (title.isNotEmpty()) {
+                                if (title.isNotEmpty() && seriesId.isNotEmpty()) {
                                     entries.add(
-                                        com.harry.maldownloader.data.AnimeEntry(
-                                            seriesId = seriesId,
+                                        AnimeEntry(
+                                            id = seriesId,
                                             title = title,
                                             type = type,
-                                            episodesTotal = episodesTotal,
-                                            userId = userId,
-                                            episodesWatched = episodesWatched,
-                                            startDate = startDate,
-                                            finishDate = finishDate,
-                                            userScore = userScore,
-                                            dvd = null,
-                                            storage = null,
+                                            score = userScore,
                                             status = status,
-                                            comments = comments,
-                                            timesWatched = null,
-                                            rewatchValue = null,
-                                            tags = tags,
-                                            rewatching = false,
-                                            rewatchingEp = null,
-                                            imagePath = null
+                                            episodesWatched = episodesWatched,
+                                            totalEpisodes = totalEpisodes,
+                                            imageUrl = imageUrl,
+                                            imagePath = null,
+                                            malUrl = malUrl,
+                                            synopsis = synopsis,
+                                            genres = genres,
+                                            studio = studio,
+                                            source = source,
+                                            startDate = startDate,
+                                            endDate = endDate,
+                                            tags = tags
                                         )
                                     )
+                                    onLog("Added entry: $title (ID: $seriesId)")
                                 } else {
-                                    onLog("Skip entry with empty title (id=$seriesId)")
+                                    onLog("Skip entry with empty title or ID (title='$title', id='$seriesId')")
                                 }
                                 insideEntry = false
                             }
@@ -135,7 +147,7 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
         } catch (e: Exception) {
             onLog("Error parsing XML: ${e.message}")
         }
-        onLog("Parsed ${entries.size} anime entries")
+        onLog("Parsed ${entries.size} entries")
         return@withContext entries
     }
 }
