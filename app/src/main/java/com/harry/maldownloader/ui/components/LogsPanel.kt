@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,7 +27,6 @@ fun LogsPanel(
         )
     ) {
         Column {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -39,26 +39,12 @@ fun LogsPanel(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                
                 Row {
-                    IconButton(onClick = onClearLogs) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Clear Logs"
-                        )
-                    }
-                    IconButton(onClick = { /* TODO: Filter logs */ }) {
-                        Icon(
-                            Icons.Default.FilterAlt,
-                            contentDescription = "Filter Logs"
-                        )
-                    }
+                    IconButton(onClick = onClearLogs) { Icon(Icons.Filled.Delete, contentDescription = "Clear Logs") }
+                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.FilterList, contentDescription = "Filter Logs") }
                 }
             }
-            
             Divider()
-            
-            // Logs content
             if (logs.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -84,9 +70,7 @@ fun LogsPanel(
                     items(logs) { log ->
                         Text(
                             text = log,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                             color = when {
                                 log.contains("ERROR") -> MaterialTheme.colorScheme.error
                                 log.contains("WARN") -> MaterialTheme.colorScheme.tertiary
