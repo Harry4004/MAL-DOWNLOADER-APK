@@ -4,7 +4,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -116,7 +122,7 @@ fun AnimeEntryCard(
                     
                     IconButton(onClick = { expanded = !expanded }) {
                         Icon(
-                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = if (expanded) "Collapse" else "Expand"
                         )
                     }
@@ -126,26 +132,14 @@ fun AnimeEntryCard(
             if (expanded) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // Entry details
                 entry.status?.let {
-                    DetailRow("Status", it)
+                    DetailRowShared("Status", it)
                 }
+                DetailRowShared("Type", entry.type)
+                entry.startDate?.let { DetailRowShared("Start Date", it) }
+                entry.endDate?.let { DetailRowShared("End Date", it) }
+                entry.tags?.let { DetailRowShared("Tags", it) }
                 
-                DetailRow("Type", entry.type)
-                
-                entry.startDate?.let {
-                    DetailRow("Start Date", it)
-                }
-                
-                entry.endDate?.let {
-                    DetailRow("End Date", it)
-                }
-                
-                entry.tags?.let {
-                    DetailRow("Tags", it)
-                }
-                
-                // Action buttons
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -170,7 +164,6 @@ fun AnimeEntryCard(
                     }
                 }
                 
-                // Additional info section
                 if (!entry.synopsis.isNullOrEmpty() || !entry.genres.isNullOrEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Card(
@@ -179,66 +172,31 @@ fun AnimeEntryCard(
                         )
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(12dp)
                         ) {
                             if (!entry.genres.isNullOrEmpty()) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.Info,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Genres",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text("Genres", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                                 }
-                                Text(
-                                    text = entry.genres!!,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(start = 24.dp)
-                                )
+                                Text(entry.genres!!, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 24.dp))
                             }
-                            
                             if (!entry.synopsis.isNullOrEmpty()) {
-                                if (!entry.genres.isNullOrEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.Info,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                if (!entry.genres.isNullOrEmpty()) Spacer(modifier = Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Synopsis",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text("Synopsis", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                                 }
-                                Text(
-                                    text = entry.synopsis!!,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(start = 24.dp)
-                                )
+                                Text(entry.synopsis!!, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 24.dp))
                             }
                         }
                     }
                 }
                 
-                // Download action
                 Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = onDownloadImages,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Button(onClick = onDownloadImages, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Download Images")
@@ -249,22 +207,14 @@ fun AnimeEntryCard(
 }
 
 @Composable
-fun DetailRow(label: String, value: String) {
+fun DetailRowShared(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }
