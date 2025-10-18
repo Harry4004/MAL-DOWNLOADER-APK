@@ -133,12 +133,12 @@ fun AnimeEntryCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 entry.status?.let {
-                    DetailRowShared("Status", it)
+                    DetailRowShared(label = "Status", value = it)
                 }
-                DetailRowShared("Type", entry.type)
-                entry.startDate?.let { DetailRowShared("Start Date", it) }
-                entry.endDate?.let { DetailRowShared("End Date", it) }
-                entry.tags?.let { DetailRowShared("Tags", it) }
+                DetailRowShared(label = "Type", value = entry.type)
+                entry.startDate?.let { DetailRowShared(label = "Start Date", value = it) }
+                entry.endDate?.let { DetailRowShared(label = "End Date", value = it) }
+                entry.tags?.let { DetailRowShared(label = "Tags", value = it) }
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -172,24 +172,52 @@ fun AnimeEntryCard(
                         )
                     ) {
                         Column(
-                            modifier = Modifier.padding(12dp)
+                            modifier = Modifier.padding(12.dp)
                         ) {
                             if (!entry.genres.isNullOrEmpty()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Genres", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = "Genres",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                                Text(entry.genres!!, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 24.dp))
+                                Text(
+                                    text = entry.genres!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 24.dp)
+                                )
                             }
                             if (!entry.synopsis.isNullOrEmpty()) {
                                 if (!entry.genres.isNullOrEmpty()) Spacer(modifier = Modifier.height(8.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Synopsis", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = "Synopsis",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                                Text(entry.synopsis!!, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 24.dp))
+                                Text(
+                                    text = entry.synopsis!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 24.dp)
+                                )
                             }
                         }
                     }
@@ -207,14 +235,25 @@ fun AnimeEntryCard(
 }
 
 @Composable
-fun DetailRowShared(label: String, value: String) {
+fun DetailRowShared(
+    label: String,
+    value: String
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
