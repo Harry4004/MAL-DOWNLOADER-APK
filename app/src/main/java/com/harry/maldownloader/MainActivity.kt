@@ -1,6 +1,7 @@
 package com.harry.maldownloader
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -14,11 +15,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -27,13 +23,11 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
-import com.harry.maldownloader.data.AnimeEntry
 import com.harry.maldownloader.data.DownloadDatabase
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.*
@@ -59,7 +53,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialize database and repository
         val database = Room.databaseBuilder(
             applicationContext,
             DownloadDatabase::class.java,
@@ -251,6 +244,7 @@ fun MainScreen(
                     onPauseDownload = { id -> scope.launch { viewModel.pauseDownload(id) } },
                     onResumeDownload = { id -> scope.launch { viewModel.resumeDownload(id) } },
                     onCancelDownload = { id -> scope.launch { viewModel.cancelDownload(id) } },
+                    onRetryDownload = { id -> scope.launch { viewModel.retryDownload(id) } },
                     modifier = Modifier.weight(1f)
                 )
                 2 -> StatisticsContent(
@@ -278,7 +272,7 @@ fun MainScreen(
     }
 }
 
-private fun getFileNameFromUri(context: android.content.Context, uri: Uri): String {
+private fun getFileNameFromUri(context: Context, uri: Uri): String {
     var name = "unknown.xml"
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
