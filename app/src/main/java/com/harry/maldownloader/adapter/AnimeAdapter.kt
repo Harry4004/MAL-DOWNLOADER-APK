@@ -36,10 +36,10 @@ class AnimeAdapter(
         val entry = entries[position]
         holder.titleText.text = entry.title
         holder.statusText.text = entry.status ?: "Unknown"
-        holder.episodesText.text = "${entry.episodesWatched ?: 0}/${entry.episodesTotal ?: 0} eps"
+        holder.episodesText.text = "${entry.episodesWatched}/${entry.totalEpisodes ?: "?"} eps"
         
-        // Load image with Coil (no placeholder/error drawables to avoid missing resource errors)
-        holder.imageView.load(entry.imagePath)
+        // Load image with Coil (fixed property name)
+        holder.imageView.load(entry.imagePath ?: entry.imageUrl)
         
         // Populate tags as chips
         holder.tagGroup.removeAllViews()
