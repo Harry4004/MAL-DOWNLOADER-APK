@@ -7,8 +7,9 @@ import androidx.work.WorkManager
 
 class DownloadCancelReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val downloadId = intent.getStringExtra("downloadId") ?: return
-        val workManager = WorkManager.getInstance(context)
-        workManager.cancelUniqueWork("download_$downloadId")
+        val downloadId = intent.getStringExtra("downloadId")
+        if (!downloadId.isNullOrBlank()) {
+            WorkManager.getInstance(context).cancelUniqueWork("download_$downloadId")
+        }
     }
 }
