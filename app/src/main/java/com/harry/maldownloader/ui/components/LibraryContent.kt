@@ -1,12 +1,8 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.harry.maldownloader.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,40 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.harry.maldownloader.data.AnimeEntry
 
-@Composable
-fun LibraryItem(entry: AnimeEntry, onDownloadImage: (AnimeEntry) -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = entry.imagePath ?: entry.imageUrl,
-                contentDescription = entry.title,
-                modifier = Modifier.size(80.dp)
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(entry.title, style = MaterialTheme.typography.titleLarge)
-                Text(entry.status ?: "", style = MaterialTheme.typography.bodyMedium)
-            }
-            IconButton(onClick = { onDownloadImage(entry) }) {
-                Icon(Icons.Filled.Download, contentDescription = "Download image")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryContent(
     entries: List<AnimeEntry>,
@@ -56,240 +20,42 @@ fun LibraryContent(
     onUpdateTags: (AnimeEntry, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("All") }
-    var selectedStatus by remember { mutableStateOf("All") }
-    var sortBy by remember { mutableStateOf("Title") }
-    var showFilters by remember { mutableStateOf(false) }
-    var selectedItems by remember { mutableStateOf(setOf<String>()) }
-
-    val filteredAndSortedEntries = remember(entries, searchQuery, selectedType, selectedStatus, sortBy) {
-        var filtered = entries
-        
-        // Apply search filter
-        if (searchQuery.isNotEmpty()) {
-            filtered = filtered.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                (it.tags?.contains(searchQuery, ignoreCase = true) == true)
-            }
-        }
-        
-        // Apply type filter
-        if (selectedType != "All") {
-            filtered = filtered.filter { it.type == selectedType }
-        }
-        
-        // Apply status filter
-        if (selectedStatus != "All") {
-            filtered = filtered.filter { it.status == selectedStatus }
-        }
-        
-        // Apply sorting
-        when (sortBy) {
-            "Title" -> filtered.sortedBy { it.title }
-            "Score" -> filtered.sortedByDescending { it.score }
-            "Episodes" -> filtered.sortedByDescending { it.episodesWatched }
-            "Date Added" -> filtered.sortedByDescending { it.id }
-            else -> filtered
-        }
-    }
-
-    Column(modifier = modifier) {
-        // Search and filter bar
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    if (entries.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Search bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search library...") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Filled.Clear, contentDescription = "Clear")
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Filter toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Filters & Sort",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    IconButton(onClick = { showFilters = !showFilters }) {
-                        Icon(
-                            imageVector = if (showFilters) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                            contentDescription = "Toggle Filters"
-                        )
-                    }
-                }
-                
-                // Expandable filters
-                if (showFilters) {
-                    Column {
-                        // Type filter
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf("All", "Anime", "Manga", "Novel").forEach { type ->
-                                FilterChip(
-                                    onClick = { selectedType = type },
-                                    label = { Text(type) },
-                                    selected = selectedType == type
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // Status filter
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf("All", "Completed", "Watching", "Plan to Watch", "Dropped").forEach { status ->
-                                FilterChip(
-                                    onClick = { selectedStatus = status },
-                                    label = { Text(status) },
-                                    selected = selectedStatus == status
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // Sort dropdown
-                        var expanded by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            OutlinedTextField(
-                                value = "Sort by: $sortBy",
-                                onValueChange = { },
-                                readOnly = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                listOf("Title", "Score", "Episodes", "Date Added").forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            sortBy = option
-                                            expanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No anime entries yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Import your MAL XML file to get started",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
-        
-        // Results count
-        Text(
-            "${filteredAndSortedEntries.size} entries",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        
-        // Multi-select toolbar
-        if (selectedItems.isNotEmpty()) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "${selectedItems.size} selected",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Row {
-                        IconButton(
-                            onClick = {
-                                // Batch download
-                                selectedItems.forEach { id ->
-                                    filteredAndSortedEntries.find { it.id == id }?.let { entry ->
-                                        onDownloadImages(entry)
-                                    }
-                                }
-                                selectedItems = emptySet()
-                            }
-                        ) {
-                            Icon(Icons.Filled.Download, contentDescription = "Batch Download")
-                        }
-                        IconButton(
-                            onClick = {
-                                // Batch tag edit - TODO: Show tag edit dialog
-                                selectedItems = emptySet()
-                            }
-                        ) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit Tags")
-                        }
-                        IconButton(
-                            onClick = { selectedItems = emptySet() }
-                        ) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Clear Selection")
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Library list
+    } else {
         LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(8.dp),
+            modifier = modifier,
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(filteredAndSortedEntries) { entry ->
-                LibraryItemCard(
+            items(entries) { entry ->
+                AnimeEntryCard(
                     entry = entry,
-                    isSelected = selectedItems.contains(entry.id),
-                    onSelectionChanged = { selected ->
-                        selectedItems = if (selected) {
-                            selectedItems + entry.id
-                        } else {
-                            selectedItems - entry.id
-                        }
-                    },
                     onDownloadImages = { onDownloadImages(entry) },
                     onUpdateTags = { tags -> onUpdateTags(entry, tags) }
                 )
@@ -298,108 +64,207 @@ fun LibraryContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryItemCard(
+fun AnimeEntryCard(
     entry: AnimeEntry,
-    isSelected: Boolean,
-    onSelectionChanged: (Boolean) -> Unit,
     onDownloadImages: () -> Unit,
-    onUpdateTags: (String) -> Unit,
-    modifier: Modifier = Modifier
+    onUpdateTags: (String) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = isSelected,
-                onClick = { onSelectionChanged(!isSelected) }
-            ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        onClick = { expanded = !expanded }
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            AsyncImage(
-                model = entry.imagePath ?: entry.imageUrl,
-                contentDescription = entry.title,
-                modifier = Modifier.size(80.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = entry.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Row {
-                    AssistChip(
-                        onClick = { },
-                        label = { Text(entry.type) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = when(entry.type) {
-                                    "Anime" -> Icons.Filled.PlayArrow
-                                    "Manga" -> Icons.Filled.MenuBook
-                                    else -> Icons.Filled.Article
-                                },
-                                contentDescription = null
-                            )
-                        }
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    AssistChip(
-                        onClick = { },
-                        label = { Text("★ ${entry.score}") }
-                    )
-                }
-                
-                entry.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Tags: $tags",
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "${entry.episodesWatched}/${entry.totalEpisodes ?: "?"} episodes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Score: ${entry.score}/10",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                
+                Row {
+                    IconButton(onClick = onDownloadImages) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Download Images"
+                        )
+                    }
+                    
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(
+                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (expanded) "Collapse" else "Expand"
+                        )
+                    }
+                }
             }
             
-            Column {
-                IconButton(onClick = onDownloadImages) {
-                    Icon(
-                        Icons.Filled.Download,
-                        contentDescription = "Download Images"
-                    )
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Entry details
+                entry.status?.let {
+                    DetailRow("Status", it)
                 }
                 
-                IconButton(
-                    onClick = {
-                        // TODO: Show tag edit dialog
-                    }
+                DetailRow("Type", entry.type)
+                
+                entry.startDate?.let {
+                    DetailRow("Start Date", it)
+                }
+                
+                entry.endDate?.let {
+                    DetailRow("End Date", it)
+                }
+                
+                entry.tags?.let {
+                    DetailRow("Tags", it)
+                }
+                
+                // Action buttons
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = "Edit Tags"
-                    )
+                    OutlinedButton(
+                        onClick = onDownloadImages,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Download")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = { /* TODO: Edit tags */ },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Edit Tags")
+                    }
+                }
+                
+                // Additional info section
+                if (!entry.synopsis.isNullOrEmpty() || !entry.genres.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            if (!entry.genres.isNullOrEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Genres",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = entry.genres!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 24.dp)
+                                )
+                            }
+                            
+                            if (!entry.synopsis.isNullOrEmpty()) {
+                                if (!entry.genres.isNullOrEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Synopsis",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = entry.synopsis!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 24.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Download action
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onDownloadImages,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Download Images")
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
