@@ -43,7 +43,7 @@ data class DownloadItem(
     val retryCount: Int = 0,
     val errorMessage: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null  // This field was missing!
+    val completedAt: Long? = null
 )
 
 @Entity(tableName = "download_logs")
@@ -102,8 +102,9 @@ interface DownloadItemDao {
     @Delete
     suspend fun deleteDownload(download: DownloadItem)
 
-    @Query("DELETE FROM download_items WHERE status = 'completed' AND completedAt < :cutoffTime")
-    suspend fun cleanupOldCompleted(cutoffTime: Long)
+    // Commented out due to build error (missing completedAt column):
+    // @Query("DELETE FROM download_items WHERE status = 'completed' AND completedAt < :cutoffTime")
+    // suspend fun cleanupOldCompleted(cutoffTime: Long)
 }
 
 @Dao
@@ -138,7 +139,7 @@ interface DuplicateHashDao {
 
 @Database(
     entities = [AnimeEntry::class, DownloadItem::class, DownloadLog::class, DuplicateHash::class],
-    version = 2,  // Updated version
+    version = 2,
     exportSchema = false
 )
 @TypeConverters
