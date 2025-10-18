@@ -17,10 +17,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -66,7 +65,6 @@ class MainActivity : ComponentActivity() {
         val repository = DownloadRepository(applicationContext, database)
         viewModel = MainViewModel(repository)
 
-        // Check initial permissions
         val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         } else true
@@ -150,7 +148,7 @@ fun MainScreen(
                         onClick = { showLogs = !showLogs }
                     ) {
                         Icon(
-                            imageVector = if (showLogs) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            imageVector = if (showLogs) Icons.Filled.Close else Icons.Filled.Info,
                             contentDescription = "Toggle Logs"
                         )
                     }
@@ -179,7 +177,7 @@ fun MainScreen(
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(
-                    imageVector = if (selectedFileUri != null) Icons.Filled.Add else Icons.Filled.Add,
+                    imageVector = Icons.Filled.Add,
                     contentDescription = if (selectedFileUri != null) "Process File" else "Select File"
                 )
             }
@@ -190,7 +188,6 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Progress indicator
             AnimatedVisibility(
                 visible = isProcessing,
                 enter = fadeIn(),
@@ -202,7 +199,6 @@ fun MainScreen(
                 )
             }
             
-            // Tabs
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -227,19 +223,14 @@ fun MainScreen(
                 )
             }
             
-            // Content based on selected tab
             when (selectedTab) {
                 0 -> LibraryContent(
                     entries = entries,
                     onDownloadImages = { entry ->
-                        scope.launch {
-                            viewModel.downloadImages(entry)
-                        }
+                        scope.launch { viewModel.downloadImages(entry) }
                     },
                     onUpdateTags = { entry, tags ->
-                        scope.launch {
-                            viewModel.updateEntryTags(entry, tags)
-                        }
+                        scope.launch { viewModel.updateEntryTags(entry, tags) }
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -258,7 +249,6 @@ fun MainScreen(
                 )
             }
             
-            // Logs panel
             AnimatedVisibility(
                 visible = showLogs,
                 enter = fadeIn(),
