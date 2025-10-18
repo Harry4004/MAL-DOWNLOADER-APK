@@ -1,6 +1,9 @@
 package com.harry.maldownloader
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
@@ -20,12 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.harry.maldownloader.data.AnimeEntry
@@ -36,6 +41,20 @@ import com.harry.maldownloader.ui.theme.MALDownloaderTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var viewModel: MainViewModel
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.setNotificationPermission(granted)
+    }
+
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.setStoragePermission(granted)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +67,16 @@ class MainActivity : ComponentActivity() {
         ).build()
         
         val repository = DownloadRepository(applicationContext, database)
+        viewModel = MainViewModel(repository)
+
+        // Check initial permissions
+        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true
+        viewModel.setNotificationPermission(notificationGranted)
+
+        val storageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        viewModel.setStoragePermission(storageGranted)
         
         setContent {
             MALDownloaderTheme {
@@ -55,10 +84,30 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(repository = repository)
+                    PermissionHandler(viewModel)
+                    MainScreen(repository = repository, viewModel = viewModel)
                 }
             }
         }
+    }
+
+    @Composable
+    fun PermissionHandler(viewModel: MainViewModel) {
+        val notificationGranted by viewModel.notificationPermissionGranted.observeAsState(false)
+        val storageGranted by viewModel.storagePermissionGranted.observeAsState(false)
+
+        PermissionRequester(
+            notificationPermissionGranted = notificationGranted,
+            storagePermissionGranted = storageGranted,
+            onRequestNotificationPermission = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onRequestStoragePermission = {
+                storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        )
     }
 }
 
@@ -66,7 +115,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     repository: DownloadRepository,
-    viewModel: MainViewModel = viewModel { MainViewModel(repository) }
+    viewModel: MainViewModel
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
