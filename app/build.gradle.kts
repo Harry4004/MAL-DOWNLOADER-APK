@@ -58,10 +58,10 @@ kotlin {
 }
 
 dependencies {
-    // Compose BOM to keep versions aligned
+    // Compose BOM
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-
-    // Core Compose
+    
+    // Core Compose - ALL ICONS INCLUDED
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
@@ -69,13 +69,13 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // Lifecycle / ViewModel & LiveData interop
+    // Lifecycle / ViewModel & LiveData - FIXES observeAsState
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.compose.runtime:runtime-livedata")
 
-    // Room (Database)
+    // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
@@ -83,13 +83,13 @@ dependencies {
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
-    // Coil for images
+    // Coil for AsyncImage
     implementation("io.coil-kt:coil-compose:2.5.0")
 
     // EXIF
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
-    // Networking (OkHttp + Retrofit + Moshi)
+    // Networking
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
