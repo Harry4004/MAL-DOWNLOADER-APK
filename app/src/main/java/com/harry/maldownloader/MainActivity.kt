@@ -16,7 +16,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -175,7 +179,7 @@ fun MainScreen(
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(
-                    imageVector = if (selectedFileUri != null) Icons.Filled.Download else Icons.Filled.Add,
+                    imageVector = if (selectedFileUri != null) Icons.Filled.Add else Icons.Filled.Add,
                     contentDescription = if (selectedFileUri != null) "Process File" else "Select File"
                 )
             }
@@ -207,19 +211,19 @@ fun MainScreen(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
                     text = { Text("Library (${entries.size})") },
-                    icon = { Icon(Icons.Filled.LibraryBooks, contentDescription = null) }
+                    icon = { Icon(Icons.Filled.Info, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = { Text("Downloads (${downloads.size})") },
-                    icon = { Icon(Icons.Filled.Download, contentDescription = null) }
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     text = { Text("Statistics") },
-                    icon = { Icon(Icons.Filled.Analytics, contentDescription = null) }
+                    icon = { Icon(Icons.Filled.Info, contentDescription = null) }
                 )
             }
             
