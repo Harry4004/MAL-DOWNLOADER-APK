@@ -43,7 +43,7 @@ data class DownloadItem(
     val retryCount: Int = 0,
     val errorMessage: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val completedAt: Long? = null  // This field was missing!
 )
 
 @Entity(tableName = "download_logs")
@@ -138,7 +138,7 @@ interface DuplicateHashDao {
 
 @Database(
     entities = [AnimeEntry::class, DownloadItem::class, DownloadLog::class, DuplicateHash::class],
-    version = 1,
+    version = 2,  // Updated version
     exportSchema = false
 )
 @TypeConverters
