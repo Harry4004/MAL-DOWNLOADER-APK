@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
 }
 
 android {
@@ -83,6 +84,11 @@ dependencies {
     
     // WorkManager for background downloads
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    
+    // Room database for download persistence
+    implementation 'androidx.room:room-runtime:2.6.0'
+    implementation 'androidx.room:room-ktx:2.6.0'
+    kapt 'androidx.room:room-compiler:2.6.0'
     
     // DataStore for settings persistence
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
