@@ -127,6 +127,14 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
         }
     }
 
+    // NEWLY ADDED retryDownload method
+    suspend fun retryDownload(id: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.retryDownload(id)
+            loadDownloads()
+        }
+    }
+
     // Data loading
     private fun loadEntries() {
         viewModelScope.launch(Dispatchers.IO) {
