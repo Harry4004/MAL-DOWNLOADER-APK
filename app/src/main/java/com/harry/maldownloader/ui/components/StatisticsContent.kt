@@ -2,10 +2,11 @@ package com.harry.maldownloader.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,13 +79,13 @@ fun StatisticsOverviewCard(
                 OverviewStat(
                     title = "Total Entries",
                     value = entries.size.toString(),
-                    icon = Icons.Filled.LibraryBooks
+                    icon = Icons.Filled.Info
                 )
                 
                 OverviewStat(
                     title = "Downloads",
                     value = downloads.size.toString(),
-                    icon = Icons.Filled.Download
+                    icon = Icons.Filled.Add
                 )
                 
                 OverviewStat(
