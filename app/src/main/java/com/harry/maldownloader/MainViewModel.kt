@@ -6,18 +6,23 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.harry.maldownloader.data.AnimeEntry
+import com.harry.maldownloader.data.DownloadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 
+// UI state data class
+
 data class UiState(
     val isProcessing: Boolean = false,
     val customTagsCsv: String = "H-NTR,M-Colored,A-Harem",
-    val logs: List<String> = emptyList()
+    val logs: List<String> = emptyList(),
+    val animeEntries: List<AnimeEntry> = emptyList()
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    
+    private val repository = DownloadRepository(app.applicationContext, app.database)
+
     private val _ui = MutableLiveData(UiState())
     val uiState: LiveData<UiState> get() = _ui
 
@@ -63,13 +68,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
+                updateUi { copy(animeEntries = entries) }
+
                 val customTags = _ui.value?.customTagsCsv?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
                     ?: emptyList()
 
                 entries.forEachIndexed { idx, raw ->
                     appendLog("Processing entry [${idx + 1}/${entries.size}]: ${raw.title}")
                     // Temporary: skip enrichment/downloading in ViewModel; pipeline handles downloads elsewhere if needed
-                    // You can re-introduce enrichment and file output by calling pipeline methods here.
                 }
 
                 appendLog("MAL XML successfully processed ${entries.size} series.")
@@ -77,6 +83,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 appendLog("Critical Error: ${e.localizedMessage}")
             } finally {
                 updateUi { copy(isProcessing = false) }
+            }
+        }
+    }
+
+    /**
+     * Download image and update entry in the observable list
+     */
+    fun downloadImageForEntry(entry: AnimeEntry) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = repository.fetchAndCacheImage(entry, getApplication())
+            val currentList = _ui.value?.animeEntries?.toMutableList() ?: mutableListOf()
+            val index = currentList.indexOfFirst { it.seriesId == updated.seriesId }
+            if (index != -1) {
+                currentList[index] = updated
+                updateUi { copy(animeEntries = currentList) }
             }
         }
     }
