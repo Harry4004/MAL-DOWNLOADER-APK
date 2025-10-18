@@ -3,102 +3,239 @@ package com.harry.maldownloader
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.view.View
-import android.widget.Button
-import android.widget.ScrollView
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.harry.maldownloader.adapter.AnimeAdapter
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.room.Room
 import com.harry.maldownloader.data.AnimeEntry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import com.harry.maldownloader.data.DownloadDatabase
+import com.harry.maldownloader.data.DownloadRepository
+import com.harry.maldownloader.ui.components.*
+import com.harry.maldownloader.ui.theme.MALDownloaderTheme
 import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var logView: TextView
-    private lateinit var selectFileBtn: Button
-    private lateinit var downloadBtn: Button
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var scrollView: ScrollView
-    private var selectedFileUri: Uri? = null
-    private lateinit var malPipeline: MalPipeline
-    private lateinit var animeAdapter: AnimeAdapter
-    private val entries: MutableList<AnimeEntry> = mutableListOf()
-
-    private val uiScope = CoroutineScope(Dispatchers.Main + Job())
+class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        setContentView(R.layout.activity_main)
-
-        logView = findViewById(R.id.logView)
-        selectFileBtn = findViewById(R.id.selectFileBtn)
-        downloadBtn = findViewById(R.id.downloadBtn)
-        recyclerView = findViewById(R.id.animeListRecycler)
-        scrollView = findViewById(R.id.logScrollView)
-        malPipeline = MalPipeline(this) { log(it) }
-
-        // Setup RecyclerView
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        animeAdapter = AnimeAdapter(entries) { position, newTags ->
-            if (position < entries.size) {
-                val entry = entries[position].copy(tags = newTags.joinToString(","))
-                entries[position] = entry
-                animeAdapter.notifyItemChanged(position)
-                log("Tags updated for ${entry.title}: ${entry.tags}")
-            }
-        }
-        recyclerView.adapter = animeAdapter
-        recyclerView.visibility = View.GONE
-
-        val filePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            uri?.let {
-                selectedFileUri = it
-                val fileName = getFileNameFromUri(it)
-                log("Selected file: $fileName")
-                downloadBtn.isEnabled = true
-            }
-        }
-
-        selectFileBtn.setOnClickListener { filePicker.launch("application/xml") }
-
-        downloadBtn.setOnClickListener {
-            selectedFileUri?.let { uri ->
-                uiScope.launch {
-                    log("Parsing MAL XML file...")
-                    entries.clear()
-                    val processedEntries = malPipeline.processMalFile(uri)
-                    entries.addAll(processedEntries)
-                    animeAdapter.notifyDataSetChanged()
-                    recyclerView.visibility = View.VISIBLE
-                    log("Done. Displayed ${entries.size} anime entries.")
+        
+        // Initialize database and repository
+        val database = Room.databaseBuilder(
+            applicationContext,
+            DownloadDatabase::class.java,
+            "mal_downloader_db"
+        ).build()
+        
+        val repository = DownloadRepository(applicationContext, database)
+        
+        setContent {
+            MALDownloaderTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainScreen(repository = repository)
                 }
-            } ?: log("Please select a MAL XML file first.")
-        }
-    }
-
-    private fun getFileNameFromUri(uri: Uri): String {
-        var name = "unknown.xml"
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst() && nameIndex != -1) {
-                name = cursor.getString(nameIndex)
             }
         }
-        return name
     }
+}
 
-    private fun log(msg: String) {
-        runOnUiThread {
-            logView.append("$msg\n")
-            scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen(
+    repository: DownloadRepository,
+    viewModel: MainViewModel = viewModel { MainViewModel(repository) }
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+    var showLogs by remember { mutableStateOf(false) }
+    
+    val entries by viewModel.animeEntries.collectAsState()
+    val downloads by viewModel.downloads.collectAsState()
+    val logs by viewModel.logs.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
+    
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedFileUri = uri
+        uri?.let {
+            val fileName = getFileNameFromUri(context, it)
+            viewModel.log("Selected file: $fileName")
         }
     }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Text(
+                        "MAL Downloader",
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
+                actions = {
+                    IconButton(
+                        onClick = { showLogs = !showLogs }
+                    ) {
+                        Icon(
+                            imageVector = if (showLogs) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = "Toggle Logs"
+                        )
+                    }
+                    IconButton(
+                        onClick = { /* TODO: Settings */ }
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    selectedFileUri?.let { uri ->
+                        scope.launch {
+                            viewModel.processMalFile(context, uri)
+                        }
+                    } ?: run {
+                        filePicker.launch("application/xml")
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    imageVector = if (selectedFileUri != null) Icons.Filled.Download else Icons.Filled.Add,
+                    contentDescription = if (selectedFileUri != null) "Process File" else "Select File"
+                )
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Progress indicator
+            AnimatedVisibility(
+                visible = isProcessing,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Library (${entries.size})") },
+                    icon = { Icon(Icons.Filled.LibraryBooks, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Downloads (${downloads.size})") },
+                    icon = { Icon(Icons.Filled.Download, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Statistics") },
+                    icon = { Icon(Icons.Filled.Analytics, contentDescription = null) }
+                )
+            }
+            
+            // Content based on selected tab
+            when (selectedTab) {
+                0 -> LibraryContent(
+                    entries = entries,
+                    onDownloadImages = { entry ->
+                        scope.launch {
+                            viewModel.downloadImages(entry)
+                        }
+                    },
+                    onUpdateTags = { entry, tags ->
+                        scope.launch {
+                            viewModel.updateEntryTags(entry, tags)
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                1 -> DownloadsContent(
+                    downloads = downloads,
+                    onPauseDownload = { id -> scope.launch { viewModel.pauseDownload(id) } },
+                    onResumeDownload = { id -> scope.launch { viewModel.resumeDownload(id) } },
+                    onCancelDownload = { id -> scope.launch { viewModel.cancelDownload(id) } },
+                    modifier = Modifier.weight(1f)
+                )
+                2 -> StatisticsContent(
+                    entries = entries,
+                    downloads = downloads,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            // Logs panel
+            AnimatedVisibility(
+                visible = showLogs,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                LogsPanel(
+                    logs = logs,
+                    onClearLogs = { viewModel.clearLogs() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun getFileNameFromUri(context: android.content.Context, uri: Uri): String {
+    var name = "unknown.xml"
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (cursor.moveToFirst() && nameIndex != -1) {
+            name = cursor.getString(nameIndex)
+        }
+    }
+    return name
 }
