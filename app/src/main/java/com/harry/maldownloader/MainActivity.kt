@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -84,8 +85,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun PermissionHandler(viewModel: MainViewModel) {
-        val notificationGranted by viewModel.notificationPermissionGranted.collectAsState(initial = false)
-        val storageGranted by viewModel.storagePermissionGranted.collectAsState(initial = false)
+        // Use observeAsState for LiveData properties
+        val notificationGranted by viewModel.notificationPermissionGranted.observeAsState(false)
+        val storageGranted by viewModel.storagePermissionGranted.observeAsState(false)
 
         PermissionRequester(
             notificationPermissionGranted = notificationGranted,
@@ -115,10 +117,11 @@ fun MainScreen(
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var showLogs by remember { mutableStateOf(false) }
 
-    val entries by viewModel.animeEntries.collectAsState(initial = emptyList())
-    val downloads by viewModel.downloads.collectAsState(initial = emptyList())
-    val logs by viewModel.logs.collectAsState(initial = emptyList())
-    val isProcessing by viewModel.isProcessing.collectAsState(initial = false)
+    // Use collectAsState for StateFlow properties
+    val entries by viewModel.animeEntries.collectAsState()
+    val downloads by viewModel.downloads.collectAsState()
+    val logs by viewModel.logs.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
