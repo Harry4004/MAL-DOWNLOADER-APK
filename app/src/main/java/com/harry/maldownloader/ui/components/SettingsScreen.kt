@@ -35,7 +35,6 @@ fun SettingsContent(
                         )
                     }
                 )
-                
                 SettingItem(
                     title = "Network Type",
                     subtitle = "Preferred network for downloads",
@@ -48,7 +47,6 @@ fun SettingsContent(
                         )
                     }
                 )
-                
                 SettingItem(
                     title = "Auto-retry Failed Downloads",
                     subtitle = "Retry downloads that fail",
@@ -62,20 +60,18 @@ fun SettingsContent(
                 )
             }
         }
-        
         item {
             SettingsSection(title = "Storage") {
                 SettingItem(
                     title = "Download Directory",
                     subtitle = "Where images are saved",
-                    icon = Icons.Default.Folder,
+                    icon = Icons.Default.Info,
                     trailing = {
                         IconButton(onClick = { /* TODO: Open folder picker */ }) {
                             Icon(Icons.Default.Edit, contentDescription = "Change")
                         }
                     }
                 )
-                
                 SettingItem(
                     title = "Cleanup Old Downloads",
                     subtitle = "Remove old completed downloads",
@@ -88,7 +84,6 @@ fun SettingsContent(
                 )
             }
         }
-        
         item {
             SettingsSection(title = "Notifications") {
                 SettingItem(
@@ -102,7 +97,6 @@ fun SettingsContent(
                         )
                     }
                 )
-                
                 SettingItem(
                     title = "Completion Notifications",
                     subtitle = "Notify when downloads complete",
@@ -116,7 +110,6 @@ fun SettingsContent(
                 )
             }
         }
-        
         item {
             SettingsSection(title = "Advanced") {
                 SettingItem(
@@ -130,7 +123,6 @@ fun SettingsContent(
                         )
                     }
                 )
-                
                 SettingItem(
                     title = "Export Logs",
                     subtitle = "Save logs to file",
@@ -186,12 +178,8 @@ private fun SettingItem(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary
         )
-        
         Spacer(modifier = Modifier.width(16.dp))
-        
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -203,7 +191,6 @@ private fun SettingItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
         trailing()
     }
 }
