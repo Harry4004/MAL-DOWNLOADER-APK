@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "application/xml"
                 addCategory(Intent.CATEGORY_OPENABLE)
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/xml", "application/xml"))
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/xml","application/xml"))
             }
             startActivityForResult(intent, REQUEST_CODE_XML)
         }
@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             // Legacy path for older Android versions
-            val picturesDir =
+            val picturesDir = 
                 File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "MAL_Export/$seriesName")
             picturesDir.mkdirs()
             val file = File(picturesDir, filename)
