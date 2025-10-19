@@ -5,7 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +41,7 @@ fun LogsPanel(
                 )
                 Row {
                     IconButton(onClick = onClearLogs) { Icon(Icons.Filled.Delete, contentDescription = "Clear Logs") }
-                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.FilterList, contentDescription = "Filter Logs") }
+                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.Info, contentDescription = "Filter Logs") }
                 }
             }
             Divider()
