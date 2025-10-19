@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -129,7 +130,6 @@ class MainActivity : AppCompatActivity() {
                     
                     var eventType = parser.eventType
                     var animeCount = 0
-                    var processedCount = 0
                     
                     withContext(Dispatchers.Main) {
                         logMessage("Starting XML parsing loop...")
@@ -147,15 +147,9 @@ class MainActivity : AppCompatActivity() {
                                             withContext(Dispatchers.Main) {
                                                 logMessage("Found anime: $title (ID: $malId)")
                                             }
-                                            
-                                            // Process every 10th anime to avoid overwhelming the API
-                                            if (processedCount < 10) {
-                                                downloadAndSaveCover(malId, title)
-                                                processedCount++
-                                                
-                                                // Add delay between requests to respect API limits
-                                                kotlinx.coroutines.delay(1000)
-                                            }
+                                            downloadAndSaveCover(malId, title)
+                                            // Add delay to respect API rate limiting
+                                            kotlinx.coroutines.delay(1000)
                                         }
                                         
                                         if (animeCount % 50 == 0) {
@@ -177,15 +171,13 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     withContext(Dispatchers.Main) {
-                        logMessage("XML parsing completed. Found $animeCount anime entries, processed $processedCount covers.")
+                        logMessage("XML parsing completed. Found $animeCount anime entries.")
                     }
-                    
                 } ?: run {
                     withContext(Dispatchers.Main) {
                         logMessage("Failed to open input stream for URI: $uri")
                     }
                 }
-                
             } catch (e: Exception) {
                 Log.e(TAG, "Error during XML parsing", e)
                 withContext(Dispatchers.Main) {
@@ -199,7 +191,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun parseAnimeEntry(parser: XmlPullParser): Pair<Int, String>? {
         var malId: String? = null
         var title: String? = null
@@ -294,7 +286,7 @@ class MainActivity : AppCompatActivity() {
                     
                     val inputStream = imageResponse.body?.byteStream()
                     if (inputStream != null) {
-                        saveImageStream(inputStream, animeTitle)
+                        saveImageStreamWithExif(inputStream, animeTitle, animeId)
                         withContext(Dispatchers.Main) {
                             logMessage("✓ Successfully saved cover for $animeTitle")
                         }
@@ -320,48 +312,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveImageStream(inputStream: java.io.InputStream, seriesName: String) {
+    private fun saveImageStreamWithExif(inputStream: java.io.InputStream, seriesName: String, malId: Int) {
         try {
-            // Sanitize filename to prevent issues
-            val sanitizedName = seriesName.replace(Regex("[^\\w\\s-]"), "_")
+            // Sanitize folder and filename
+            val sanitizedFolderName = seriesName.replace(Regex("[^\\w\\s-]"), "_")
                 .replace(Regex("\\s+"), "_")
-                .take(50) // Limit filename length
-            
-            val filename = "${sanitizedName}.jpg"
+                .take(50)
+            val sanitizedFileName = "cover_${malId}.jpg"
             
             if (Build.VERSION.SDK_INT >= 29) {
-                // Use MediaStore for Android 10+
+                // Save to specific folder inside Pictures/MAL_Export
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Images.Media.DISPLAY_NAME, sanitizedFileName)
                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MAL_Export")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MAL_Export/$sanitizedFolderName")
                 }
-                
                 val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 uri?.let { imageUri ->
                     contentResolver.openOutputStream(imageUri)?.use { outputStream ->
+                        // Save bytes
                         inputStream.copyTo(outputStream)
+                        outputStream.flush()
+
+                        // Write EXIF tags
+                        ExifInterface(outputStream).apply {
+                            setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
+                            setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
+                            saveAttributes()
+                        }
                     }
                 }
             } else {
-                // Legacy path for older Android versions
                 val picturesDir = File(
-                    android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_PICTURES
-                    ), "MAL_Export"
+                    android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
+                    "MAL_Export/$sanitizedFolderName"
                 )
-                
                 if (!picturesDir.exists()) {
                     picturesDir.mkdirs()
                 }
-                
-                val file = File(picturesDir, filename)
+                val file = File(picturesDir, sanitizedFileName)
                 FileOutputStream(file).use { outputStream ->
                     inputStream.copyTo(outputStream)
+                    outputStream.flush()
+                    
+                    // Write EXIF tags
+                    ExifInterface(file.absolutePath).apply {
+                        setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
+                        setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
+                        saveAttributes()
+                    }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving image for $seriesName", e)
+            Log.e(TAG, "Error saving image with EXIF for $seriesName", e)
             runOnUiThread {
                 logMessage("Failed to save image for $seriesName: ${e.message}")
             }
