@@ -27,6 +27,7 @@ import org.xmlpull.v1.XmlPullParserException
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
@@ -312,36 +313,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveImageStreamWithExif(inputStream: java.io.InputStream, seriesName: String, malId: Int) {
+    private fun saveImageStreamWithExif(inputStream: InputStream, seriesName: String, malId: Int) {
         try {
-            // Sanitize folder and filename
             val sanitizedFolderName = seriesName.replace(Regex("[^\\w\\s-]"), "_")
                 .replace(Regex("\\s+"), "_")
                 .take(50)
             val sanitizedFileName = "cover_${malId}.jpg"
-            
+
             if (Build.VERSION.SDK_INT >= 29) {
-                // Save to specific folder inside Pictures/MAL_Export
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, sanitizedFileName)
                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                     put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MAL_Export/$sanitizedFolderName")
                 }
+
                 val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 uri?.let { imageUri ->
                     contentResolver.openOutputStream(imageUri)?.use { outputStream ->
-                        // Save bytes
                         inputStream.copyTo(outputStream)
                         outputStream.flush()
-
-                        // Write EXIF tags
-                        ExifInterface(outputStream).apply {
-                            setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
-                            setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
-                            saveAttributes()
-                        }
                     }
+                    // Now update EXIF on saved image via Uri's InputStream
+                    contentResolver.openInputStream(uri)?.use { exifInputStream ->
+                        val exif = ExifInterface(exifInputStream)
+                        exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
+                        exif.setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
+                        exif.saveAttributes()
+                    }
+
                 }
+
             } else {
                 val picturesDir = File(
                     android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
@@ -354,14 +355,12 @@ class MainActivity : AppCompatActivity() {
                 FileOutputStream(file).use { outputStream ->
                     inputStream.copyTo(outputStream)
                     outputStream.flush()
-                    
-                    // Write EXIF tags
-                    ExifInterface(file.absolutePath).apply {
-                        setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
-                        setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
-                        saveAttributes()
-                    }
                 }
+                // Update EXIF on saved file
+                val exif = ExifInterface(file.absolutePath)
+                exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "MAL Anime ID: $malId")
+                exif.setAttribute(ExifInterface.TAG_USER_COMMENT, seriesName)
+                exif.saveAttributes()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving image with EXIF for $seriesName", e)
@@ -370,14 +369,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun logMessage(message: String) {
         Log.d(TAG, message)
         runOnUiThread {
             tvLogs.append("${System.currentTimeMillis() % 100000}: $message\n")
         }
     }
-    
+
     private fun showToast(message: String) {
         runOnUiThread {
             Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
