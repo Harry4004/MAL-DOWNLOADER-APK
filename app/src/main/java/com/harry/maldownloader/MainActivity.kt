@@ -22,13 +22,13 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.harry.maldownloader.data.DownloadDatabase
@@ -88,8 +88,8 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun PermissionHandler(viewModel: MainViewModel) {
-        val notificationGranted by viewModel.notificationPermissionGranted.collectAsStateWithLifecycle(false)
-        val storageGranted by viewModel.storagePermissionGranted.collectAsStateWithLifecycle(false)
+        val notificationGranted by viewModel.notificationPermissionGranted.collectAsStateWithLifecycle()
+        val storageGranted by viewModel.storagePermissionGranted.collectAsStateWithLifecycle()
 
         PermissionRequester(
             notificationPermissionGranted = notificationGranted,
@@ -119,10 +119,10 @@ fun MainScreen(
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var showLogs by remember { mutableStateOf(false) }
 
-    val entries by viewModel.animeEntries.collectAsStateWithLifecycle()
-    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
-    val logs by viewModel.logs.collectAsStateWithLifecycle()
-    val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
+    val entries = viewModel.animeEntries.collectAsStateWithLifecycle(emptyList()).value
+    val downloads = viewModel.downloads.collectAsStateWithLifecycle(emptyList()).value
+    val logs = viewModel.logs.collectAsStateWithLifecycle(emptyList()).value
+    val isProcessing = viewModel.isProcessing.collectAsStateWithLifecycle(false).value
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
