@@ -1,260 +1,158 @@
 package com.harry.maldownloader
 
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
+import android.app.Activity
+import android.content.ContentValues
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.OpenableColumns
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.room.Room
-import com.harry.maldownloader.data.DownloadDatabase
-import com.harry.maldownloader.data.DownloadRepository
-import com.harry.maldownloader.ui.components.*
-import com.harry.maldownloader.ui.theme.MALDownloaderTheme
+import android.provider.MediaStore
+import android.util.Xml
+import android.widget.Button
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import org.xmlpull.v1.XmlPullParser
+import java.io.File
+import java.io.FileOutputStream
 
-class MainActivity : ComponentActivity() {
-
-    private lateinit var viewModel: MainViewModel
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        viewModel.setNotificationPermission(granted)
-    }
-
-    private val storagePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        viewModel.setStoragePermission(granted)
-    }
+class MainActivity : AppCompatActivity() {
+    private val client = OkHttpClient()
+    private lateinit var tvLogs: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        tvLogs = findViewById(R.id.tvLogs)
+        findViewById<Button>(R.id.btnLoadXml).setOnClickListener {
+            // Open document picker for XML files
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "application/xml"
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/xml", "application/xml"))
+            }
+            startActivityForResult(intent, REQUEST_CODE_XML)
+        }
+    }
 
-        val database = Room.databaseBuilder(
-            applicationContext,
-            DownloadDatabase::class.java,
-            "mal_downloader_db"
-        ).build()
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_CODE_XML && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { uri ->
+                parseMalXml(uri)
+            }
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
 
-        val repository = DownloadRepository(applicationContext, database)
-        viewModel = MainViewModel(repository)
+    private fun parseMalXml(uri: Uri) {
+        contentResolver.openInputStream(uri)?.use { inputStream ->
+            // Launch a coroutine to do parsing and downloading off the main thread
+            lifecycleScope.launch(Dispatchers.IO) {
+                val parser = Xml.newPullParser()
+                parser.setInput(inputStream, null)
+                var event = parser.eventType
+                // Iterate through XML
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    if (event == XmlPullParser.START_TAG && parser.name == "anime") {
+                        // Found an <anime> entry; read its children
+                        var malId: String? = null
+                        var title: String? = null
+                        while (true) {
+                            event = parser.next()
+                            if (event == XmlPullParser.END_TAG && parser.name == "anime") break
+                            if (event == XmlPullParser.START_TAG) {
+                                when (parser.name) {
+                                    "series_animedb_id" -> malId = parser.nextText().trim()
+                                    "series_title" -> title = parser.nextText().trim()
+                                }
+                            }
+                        }
+                        // If we got both ID and title, process it
+                        if (!malId.isNullOrEmpty()) {
+                            val name = title ?: "Anime-$malId"
+                            runOnUiThread { tvLogs.append("Processing: $name (ID $malId)\n") }
+                            downloadAndSaveCover(malId.toInt(), name)
+                        }
+                    }
+                    event = parser.next()
+                }
+                runOnUiThread { tvLogs.append("Done processing XML.\n") }
+            }
+        } ?: run {
+            tvLogs.append("Failed to open XML file.\n")
+        }
+    }
 
-        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-        viewModel.setNotificationPermission(notificationGranted)
-
-        val storageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        viewModel.setStoragePermission(storageGranted)
-
-        setContent {
-            MALDownloaderTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    PermissionHandler(viewModel)
-                    MainScreen(repository = repository, viewModel = viewModel)
+    private fun downloadAndSaveCover(animeId: Int, animeTitle: String) {
+        try {
+            // 1. Fetch anime info from Jikan
+            val url = "https://api.jikan.moe/v4/anime/$animeId"
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { res ->
+                if (!res.isSuccessful) {
+                    runOnUiThread { tvLogs.append("Failed to fetch anime $animeId data.\n") }
+                    return
+                }
+                val json = JSONObject(res.body!!.string())
+                val data = json.getJSONObject("data")
+                // Attempt to get large image URL
+                val images = data.getJSONObject("images").getJSONObject("jpg")
+                val imageUrl = images.optString("large_image_url", "")
+                if (imageUrl.isEmpty()) {
+                    runOnUiThread { tvLogs.append("No image URL for $animeTitle.\n") }
+                    return
+                }
+                // 2. Download image bytes
+                val imgReq = Request.Builder().url(imageUrl).build()
+                client.newCall(imgReq).execute().use { imgRes ->
+                    if (!imgRes.isSuccessful) {
+                        runOnUiThread { tvLogs.append("Failed to download image for $animeTitle.\n") }
+                        return
+                    }
+                    val input = imgRes.body!!.byteStream()
+                    // 3. Save to MediaStore or external file
+                    saveImageStream(input, animeTitle)
+                    runOnUiThread { tvLogs.append("Saved cover for $animeTitle\n") }
                 }
             }
+        } catch (e: Exception) {
+            runOnUiThread { tvLogs.append("Error for $animeTitle: ${e.message}\n") }
         }
     }
 
-    @Composable
-    fun PermissionHandler(viewModel: MainViewModel) {
-        // Use observeAsState for LiveData properties
-        val notificationGranted by viewModel.notificationPermissionGranted.observeAsState(false)
-        val storageGranted by viewModel.storagePermissionGranted.observeAsState(false)
-
-        PermissionRequester(
-            notificationPermissionGranted = notificationGranted,
-            storagePermissionGranted = storageGranted,
-            onRequestNotificationPermission = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    private fun saveImageStream(inputStream: java.io.InputStream, seriesName: String) {
+        val filename = "${seriesName}.jpg"
+        if (Build.VERSION.SDK_INT >= 29) {
+            // Use MediaStore for Android 10+
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MAL_Export/$seriesName")
+            }
+            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            uri?.let {
+                contentResolver.openOutputStream(it)?.use { out ->
+                    inputStream.copyTo(out)
                 }
-            },
-            onRequestStoragePermission = {
-                storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen(
-    repository: DownloadRepository,
-    viewModel: MainViewModel
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var showLogs by remember { mutableStateOf(false) }
-
-    // Use collectAsState for StateFlow properties
-    val entries by viewModel.animeEntries.collectAsState()
-    val downloads by viewModel.downloads.collectAsState()
-    val logs by viewModel.logs.collectAsState()
-    val isProcessing by viewModel.isProcessing.collectAsState()
-
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        selectedFileUri = uri
-        uri?.let {
-            val fileName = getFileNameFromUri(context, it)
-            viewModel.log("Selected file: $fileName")
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("MAL Downloader", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { showLogs = !showLogs }) {
-                        Icon(
-                            imageVector = if (showLogs) Icons.Filled.Close else Icons.Filled.Info,
-                            contentDescription = "Toggle Logs"
-                        )
-                    }
-                    IconButton(onClick = { /* TODO: Settings */ }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    selectedFileUri?.let { uri ->
-                        scope.launch { viewModel.processMalFile(context, uri) }
-                    } ?: run { filePicker.launch("application/xml") }
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = if (selectedFileUri != null) "Process File" else "Select File"
-                )
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            AnimatedVisibility(
-                visible = isProcessing,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Library (${entries.size})") },
-                    icon = { Icon(Icons.Filled.Info, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Downloads (${downloads.size})") },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Statistics") },
-                    icon = { Icon(Icons.Filled.Info, contentDescription = null) }
-                )
-            }
-
-            when (selectedTab) {
-                0 -> LibraryContent(
-                    entries = entries,
-                    onDownloadImages = { entry -> scope.launch { viewModel.downloadImages(entry) } },
-                    onUpdateTags = { entry, tags -> scope.launch { viewModel.updateEntryTags(entry, tags) } },
-                    modifier = Modifier.weight(1f)
-                )
-                1 -> DownloadsContent(
-                    downloads = downloads,
-                    onPauseDownload = { id -> scope.launch { viewModel.pauseDownload(id) } },
-                    onResumeDownload = { id -> scope.launch { viewModel.resumeDownload(id) } },
-                    onCancelDownload = { id -> scope.launch { viewModel.cancelDownload(id) } },
-                    onRetryDownload = { id -> scope.launch { viewModel.retryDownload(id) } },
-                    modifier = Modifier.weight(1f)
-                )
-                2 -> StatisticsContent(
-                    entries = entries,
-                    downloads = downloads,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showLogs,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                LogsPanel(
-                    logs = logs,
-                    onClearLogs = { viewModel.clearLogs() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                )
+        } else {
+            // Legacy path for older Android versions
+            val picturesDir =
+                File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "MAL_Export/$seriesName")
+            picturesDir.mkdirs()
+            val file = File(picturesDir, filename)
+            FileOutputStream(file).use { out ->
+                inputStream.copyTo(out)
             }
         }
     }
-}
 
-private fun getFileNameFromUri(context: Context, uri: Uri): String {
-    var name = "unknown.xml"
-    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (cursor.moveToFirst() && nameIndex != -1) {
-            name = cursor.getString(nameIndex)
-        }
+    companion object {
+        private const val REQUEST_CODE_XML = 1001
     }
-    return name
 }
