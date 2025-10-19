@@ -11,9 +11,16 @@
         android:layout_height="wrap_content">
 
         <Button
+            android:id="@+id/btnToggleNightMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Toggle Night Mode" />
+
+        <Button
             android:id="@+id/btnLoadXml"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="Select MAL XML File" />
 
         <TextView
