@@ -1,5 +1,6 @@
 package com.harry.maldownloader
 
+import android.content.SharedPreferences
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
