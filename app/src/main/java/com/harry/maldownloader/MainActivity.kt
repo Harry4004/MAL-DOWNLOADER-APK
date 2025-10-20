@@ -21,9 +21,7 @@ import java.io.InputStream
 data class MediaEntry(
     val malId: Int,
     val title: String,
-    val type: String, // "anime" or "manga"
-    val genres: List<String> = emptyList(),
-    val isHentai: Boolean = false
+    val type: String // "anime" or "manga"
 )
 
 class MainActivity : AppCompatActivity() {
@@ -82,28 +80,66 @@ class MainActivity : AppCompatActivity() {
                 parser.setInput(inputStream, null)
 
                 var eventType = parser.eventType
-                var mangaCount = 0
+                val entries = mutableListOf<MediaEntry>()
                 var animeCount = 0
-
+                var mangaCount = 0
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     if (eventType == XmlPullParser.START_TAG) {
                         when (parser.name?.lowercase()) {
-                            "anime" -> animeCount++
+                            "anime" -> {
+                                animeCount++
+                                val entry = parseMediaEntry(parser, "anime")
+                                entry?.let { entries.add(it) }
+                            }
                             "manga" -> {
                                 mangaCount++
-                                // Optionally, parse fields for further use here
+                                val entry = parseMediaEntry(parser, "manga")
+                                entry?.let { entries.add(it) }
                             }
                         }
                     }
                     eventType = parser.next()
                 }
-
                 withContext(Dispatchers.Main) {
-                    logMessage("XML parsing complete: Found $animeCount anime and $mangaCount manga entries.")
+                    logMessage("XML parsing complete: Found $animeCount anime and $mangaCount manga entries. Starting info fetch...")
+                }
+                for (entry in entries) {
+                    withContext(Dispatchers.Main) {
+                        logMessage("Ready to fetch info for ${entry.type.capitalize()} ${entry.title} (ID: ${entry.malId})")
+                    }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { logMessage("Error reading XML: ${e.message}") }
             }
+        }
+    }
+
+    private fun parseMediaEntry(parser: XmlPullParser, type: String): MediaEntry? {
+        var malId: String? = null
+        var title: String? = null
+        try {
+            while (true) {
+                val eventType = parser.next()
+                if (eventType == XmlPullParser.END_TAG && parser.name?.equals(type, ignoreCase = true) == true) {
+                    break
+                }
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (type == "anime") {
+                        if (parser.name == "series_animedb_id") malId = parser.nextText()?.trim()
+                        if (parser.name == "series_title") title = parser.nextText()?.trim()
+                    } else if (type == "manga") {
+                        if (parser.name == "manga_mangadb_id") malId = parser.nextText()?.trim()
+                        if (parser.name == "manga_title") title = parser.nextText()?.trim()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing $type entry", e)
+        }
+        return if (!malId.isNullOrEmpty() && malId.toIntOrNull() != null && !title.isNullOrEmpty()) {
+            MediaEntry(malId.toInt(), title!!, type.lowercase())
+        } else {
+            null
         }
     }
 
