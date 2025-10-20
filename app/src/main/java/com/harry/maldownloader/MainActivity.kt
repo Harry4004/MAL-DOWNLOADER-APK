@@ -14,7 +14,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -23,19 +22,30 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import org.w3c.dom.Document
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 data class MediaEntry(
     val malId: Int,
     val title: String,
     val type: String, // "anime" or "manga" or "hentai"
     val genres: List<String> = emptyList(),
-    val isHentai: Boolean = false
+    val isHentai: Boolean = false,
+    val synopsis: String = "",
+    val score: Float = 0f,
+    val status: String = "",
+    val episodes: Int = 0,
+    val year: Int = 0
 )
 
 class MainActivity : AppCompatActivity() {
@@ -216,7 +226,7 @@ class MainActivity : AppCompatActivity() {
                 val data = json.getJSONObject("data")
                 val imageUrl = data.getJSONObject("images").getJSONObject("jpg").optString("large_image_url", "")
 
-                // Extract genres
+                // Extract comprehensive metadata
                 val apiGenres = mutableListOf<String>()
                 val genresArray = data.optJSONArray("genres")
                 if (genresArray != null) {
@@ -225,10 +235,24 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                val enrichedEntry = entry.copy(genres = apiGenres, isHentai = apiGenres.any { it.contains("Hentai", ignoreCase = true) })
+                val synopsis = data.optString("synopsis", "")
+                val score = data.optDouble("score", 0.0).toFloat()
+                val status = data.optString("status", "")
+                val episodes = data.optInt("episodes", 0)
+                val year = data.optJSONObject("aired")?.optString("from", "")?.take(4)?.toIntOrNull() ?: 0
+
+                val enrichedEntry = entry.copy(
+                    genres = apiGenres, 
+                    isHentai = apiGenres.any { it.contains("Hentai", ignoreCase = true) },
+                    synopsis = synopsis,
+                    score = score,
+                    status = status,
+                    episodes = episodes,
+                    year = year
+                )
 
                 if (imageUrl.isNotEmpty()) {
-                    downloadCoverAndEmbedExif(imageUrl, enrichedEntry)
+                    downloadCoverAndEmbedXmp(imageUrl, enrichedEntry)
                 } else {
                     withContext(Dispatchers.Main) {
                         logMessage("No image found for ${entry.title}")
@@ -242,7 +266,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun downloadCoverAndEmbedExif(imageUrl: String, entry: MediaEntry) {
+    private suspend fun downloadCoverAndEmbedXmp(imageUrl: String, entry: MediaEntry) {
         withContext(Dispatchers.Main) {
             logMessage("Downloading cover for ${entry.title}...")
         }
@@ -262,7 +286,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 response.body?.byteStream()?.use { inputStream ->
-                    saveImageWithExif(inputStream, entry)
+                    saveImageWithXmp(inputStream, entry)
                 }
             }
 
@@ -273,12 +297,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveImageWithExif(inputStream: InputStream, entry: MediaEntry) {
+    private fun saveImageWithXmp(inputStream: InputStream, entry: MediaEntry) {
         try {
             val sanitizedFolder = when {
-                entry.isHentai -> "Hentai/${entry.type.capitalize()} Hentai"
+                entry.isHentai -> "Hentai/${entry.type.capitalize()}_Hentai"
                 entry.type == "anime" -> "Anime"
-                entry.type == "manga" -> "Manga/Anime Manga"
+                entry.type == "manga" -> "Manga/Anime_Manga"
                 else -> "Misc"
             }
 
@@ -300,15 +324,30 @@ class MainActivity : AppCompatActivity() {
                         outputStream.flush()
                     }
 
+                    // For Android 29+, we need to get the actual file path for XMP embedding
+                    // This is a simplified approach - in production you'd handle this more robustly
                     try {
-                        contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
-                            val exif = ExifInterface(pfd.fileDescriptor)
-                            writeExifMetadata(exif, entry)
+                        val tempFile = File(cacheDir, fileName)
+                        contentResolver.openInputStream(uri)?.use { uriInputStream ->
+                            tempFile.outputStream().use { tempOutputStream ->
+                                uriInputStream.copyTo(tempOutputStream)
+                            }
                         }
-                        runOnUiThread { logMessage("EXIF metadata embedded in ${entry.title}") }
-                    } catch (exifError: Exception) {
-                        Log.e(TAG, "Failed writing EXIF for ${entry.title}", exifError)
-                        runOnUiThread { logMessage("Failed to write EXIF for ${entry.title}") }
+                        
+                        writeXmpMetadata(tempFile, entry)
+                        
+                        // Write back to MediaStore
+                        contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            tempFile.inputStream().use { tempInputStream ->
+                                tempInputStream.copyTo(outputStream)
+                            }
+                        }
+                        
+                        tempFile.delete()
+                        runOnUiThread { logMessage("XMP metadata embedded in ${entry.title}") }
+                    } catch (xmpError: Exception) {
+                        Log.e(TAG, "Failed writing XMP for ${entry.title}", xmpError)
+                        runOnUiThread { logMessage("Failed to write XMP for ${entry.title}") }
                     }
                 }
             } else {
@@ -325,12 +364,11 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 try {
-                    val exif = ExifInterface(file.absolutePath)
-                    writeExifMetadata(exif, entry)
-                    runOnUiThread { logMessage("EXIF metadata embedded in ${entry.title}") }
-                } catch (exifError: Exception) {
-                    Log.e(TAG, "Failed writing EXIF for ${entry.title}", exifError)
-                    runOnUiThread { logMessage("Failed to write EXIF for ${entry.title}") }
+                    writeXmpMetadata(file, entry)
+                    runOnUiThread { logMessage("XMP metadata embedded in ${entry.title}") }
+                } catch (xmpError: Exception) {
+                    Log.e(TAG, "Failed writing XMP for ${entry.title}", xmpError)
+                    runOnUiThread { logMessage("Failed to write XMP for ${entry.title}") }
                 }
             }
 
@@ -340,16 +378,110 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun writeExifMetadata(exif: ExifInterface, entry: MediaEntry) {
-        exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "${entry.type.capitalize()} MAL ID: ${entry.malId}")
-        exif.setAttribute(ExifInterface.TAG_USER_COMMENT, "Title: ${entry.title} | Genres: ${entry.genres.joinToString(", ")}")
-        exif.setAttribute(ExifInterface.TAG_ARTIST, "MAL Downloader")
-
-        if (entry.isHentai) {
-            exif.setAttribute(ExifInterface.TAG_COPYRIGHT, "Adult Content - Hentai")
+    private fun writeXmpMetadata(file: File, entry: MediaEntry) {
+        try {
+            // Create XMP document
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            val builder = factory.newDocumentBuilder()
+            val doc = builder.newDocument()
+            
+            // Create XMP structure with proper namespaces
+            val rdf = doc.createElementNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:RDF")
+            rdf.setAttribute("xmlns:rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+            rdf.setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/")
+            rdf.setAttribute("xmlns:mal", "http://myanimelist.net/")
+            rdf.setAttribute("xmlns:xmp", "http://ns.adobe.com/xap/1.0/")
+            doc.appendChild(rdf)
+            
+            val description = doc.createElementNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:Description")
+            description.setAttribute("rdf:about", "")
+            rdf.appendChild(description)
+            
+            // Add comprehensive MAL metadata as XMP tags
+            description.setAttribute("dc:title", entry.title)
+            description.setAttribute("dc:description", entry.synopsis.take(500)) // Limit synopsis length
+            description.setAttribute("dc:creator", "MAL Downloader")
+            description.setAttribute("dc:subject", entry.genres.joinToString(", "))
+            description.setAttribute("mal:id", entry.malId.toString())
+            description.setAttribute("mal:type", entry.type)
+            description.setAttribute("mal:genres", entry.genres.joinToString(", "))
+            description.setAttribute("mal:score", entry.score.toString())
+            description.setAttribute("mal:status", entry.status)
+            description.setAttribute("mal:episodes", entry.episodes.toString())
+            description.setAttribute("mal:year", entry.year.toString())
+            description.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString()) // Convert 10-point to 5-star
+            
+            if (entry.isHentai) {
+                description.setAttribute("dc:rights", "Adult Content - Hentai")
+                description.setAttribute("mal:adult", "true")
+            }
+            
+            // Convert XMP document to string
+            val transformer = TransformerFactory.newInstance().newTransformer()
+            transformer.setOutputProperty("omit-xml-declaration", "yes")
+            val source = DOMSource(doc)
+            val outputStream = ByteArrayOutputStream()
+            val result = StreamResult(outputStream)
+            transformer.transform(source, result)
+            
+            val xmpString = outputStream.toString("UTF-8")
+            val xmpBytes = xmpString.toByteArray(Charsets.UTF_8)
+            
+            // Embed XMP in JPEG file
+            val originalBytes = file.readBytes()
+            val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
+            
+            file.writeBytes(newBytes)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
+            throw e
         }
+    }
 
-        exif.saveAttributes()
+    private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        
+        try {
+            // Write JPEG SOI marker
+            outputStream.write(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
+            
+            // Create XMP APP1 segment
+            val xmpHeader = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(Charsets.UTF_8)
+            val segmentSize = xmpHeader.size + xmpBytes.size + 2 // +2 for length bytes
+            
+            if (segmentSize <= 65535) { // APP1 segment size limit
+                outputStream.write(byteArrayOf(0xFF.toByte(), 0xE1.toByte())) // APP1 marker
+                outputStream.write(byteArrayOf((segmentSize shr 8).toByte(), (segmentSize and 0xFF).toByte()))
+                outputStream.write(xmpHeader)
+                outputStream.write(xmpBytes)
+            }
+            
+            // Write rest of JPEG (skip original SOI)
+            var i = 2
+            while (i < jpegBytes.size) {
+                if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) {
+                    val marker = jpegBytes[i + 1].toInt() and 0xFF
+                    if (marker == 0xE1) { // Skip existing APP1 segments to avoid duplicates
+                        i += 2
+                        if (i + 1 < jpegBytes.size) {
+                            val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF)
+                            i += segLen
+                            continue
+                        }
+                    }
+                }
+                outputStream.write(jpegBytes[i])
+                i++
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error embedding XMP", e)
+            return jpegBytes // Return original if embedding fails
+        }
+        
+        return outputStream.toByteArray()
     }
 
     private fun showToast(message: String) {
