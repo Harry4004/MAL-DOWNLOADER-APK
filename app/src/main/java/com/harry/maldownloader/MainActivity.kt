@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
@@ -193,12 +192,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun downloadAndSaveCover(mediaEntry: MediaEntry) {
-        // Implementation to fetch details, save image, and embed rich EXIF metadata with all possible MAL data
-        // This step will be complex and involve querying MAL API, parsing many fields, sanitizing strings, creating genre-based folders, and saving tags
-        // For now, this is a placeholder to demonstrate that next development step is underway
         withContext(Dispatchers.Main) {
             logMessage("Downloading cover: ${mediaEntry.title} (ID: ${mediaEntry.malId})")
         }
+
+        // Placeholder for full MAL metadata extraction and EXIF embedding (next update)
+        // Downloads image, saves under correct genre-based folder, embeds rich metadata
     }
 
     private fun showToast(message: String) {
