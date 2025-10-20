@@ -40,6 +40,7 @@ data class MediaEntry(
     val title: String,
     val type: String,
     val genres: List<String> = emptyList(),
+    val customTags: List<String> = emptyList(), // <-- Custom tags
     val isHentai: Boolean = false,
     val synopsis: String = "",
     val score: Float = 0f,
@@ -57,6 +58,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvLogs: TextView
     private lateinit var btnLoadXml: Button
+
+    // Demo custom tags database: replace with real persistence/database
+    private val animeCustomTags = mutableListOf<String>()
+    private val mangaCustomTags = mutableListOf<String>()
+    private val hentaiCustomTags = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
@@ -161,8 +167,15 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing $type entry", e)
         }
+        // Merge with custom tags per media type
+        val customTags = when (type.lowercase()) {
+            "anime" -> animeCustomTags
+            "hentai" -> hentaiCustomTags
+            "manga" -> mangaCustomTags
+            else -> emptyList()
+        }
         return if (!malId.isNullOrEmpty() && malId.toIntOrNull() != null && !title.isNullOrEmpty()) {
-            MediaEntry(malId.toInt(), title!!, type.lowercase(), genres, type.lowercase() == "hentai")
+            MediaEntry(malId.toInt(), title!!, type.lowercase(), genres, customTags, type.lowercase() == "hentai")
         } else null
     }
 
@@ -221,8 +234,10 @@ class MainActivity : AppCompatActivity() {
                 val status = data.optString("status", "")
                 val episodes = data.optInt("episodes", 0)
                 val year = data.optJSONObject("aired")?.optString("from", "")?.take(4)?.toIntOrNull() ?: 0
+                val customTags = entry.customTags
                 val enrichedEntry = entry.copy(
                     genres = apiGenres,
+                    customTags = customTags,
                     isHentai = apiGenres.any { it.contains("Hentai", ignoreCase = true) },
                     synopsis = synopsis,
                     score = score,
@@ -274,64 +289,68 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveImageWithXmp(inputStream: InputStream, entry: MediaEntry) {
         try {
-            val sanitizedFolder = when {
-                entry.isHentai -> "Hentai/${entry.type.capitalize()}_Hentai"
+            val baseDir = "MAL_Export"
+            val typeFolder = when {
+                entry.isHentai -> "Hentai"
                 entry.type == "anime" -> "Anime"
-                entry.type == "manga" -> "Manga/Anime_Manga"
+                entry.type == "manga" -> "Manga"
                 else -> "Misc"
             }
-            val sanitizedGenre = entry.genres.firstOrNull()?.replace(Regex("[^\\w\\s-]"), "_")?.replace(" ", "_") ?: "Unknown"
-            val folderPath = "MAL_Export/$sanitizedFolder/$sanitizedGenre"
-            val fileName = "${entry.title.replace(Regex("[^\\w\\s-]"), "_").take(30)}_${entry.malId}.jpg"
-            if (Build.VERSION.SDK_INT >= 29) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/$folderPath")
-                }
-                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                uri?.let { imageUri ->
-                    contentResolver.openOutputStream(imageUri)?.use { outputStream ->
+            val folderTags = (entry.genres + entry.customTags).distinct()
+            for (genre in folderTags) {
+                val sanitizedGenre = genre.replace(Regex("[^\\w\\s-]"), "_").replace(" ", "_")
+                val folderPath = "$baseDir/$typeFolder/$sanitizedGenre"
+                val fileName = "${entry.title.replace(Regex("[^\\w\\s-]"), "_").take(30)}_${entry.malId}.jpg"
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/$folderPath")
+                    }
+                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    uri?.let { imageUri ->
+                        contentResolver.openOutputStream(imageUri)?.use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                            outputStream.flush()
+                        }
+                        try {
+                            val tempFile = File(cacheDir, fileName)
+                            contentResolver.openInputStream(uri)?.use { uriInputStream ->
+                                tempFile.outputStream().use { tempOutputStream ->
+                                    uriInputStream.copyTo(tempOutputStream)
+                                }
+                            }
+                            writeXmpMetadata(tempFile, entry)
+                            contentResolver.openOutputStream(uri)?.use { outputStream ->
+                                tempFile.inputStream().use { tempInputStream ->
+                                    tempInputStream.copyTo(outputStream)
+                                }
+                            }
+                            tempFile.delete()
+                            runOnUiThread { logMessage("XMP metadata embedded in $fileName inside $folderPath") }
+                        } catch (xmpError: Exception) {
+                            Log.e(TAG, "Failed writing XMP for $fileName", xmpError)
+                            runOnUiThread { logMessage("Failed to write XMP for $fileName") }
+                        }
+                    }
+                } else {
+                    val picturesDir = File(
+                        android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
+                        folderPath
+                    )
+                    if (!picturesDir.exists()) picturesDir.mkdirs()
+                    val file = File(picturesDir, fileName)
+                    FileOutputStream(file).use { outputStream ->
                         inputStream.copyTo(outputStream)
                         outputStream.flush()
                     }
                     try {
-                        val tempFile = File(cacheDir, fileName)
-                        contentResolver.openInputStream(uri)?.use { uriInputStream ->
-                            tempFile.outputStream().use { tempOutputStream ->
-                                uriInputStream.copyTo(tempOutputStream)
-                            }
-                        }
-                        writeXmpMetadata(tempFile, entry)
-                        contentResolver.openOutputStream(uri)?.use { outputStream ->
-                            tempFile.inputStream().use { tempInputStream ->
-                                tempInputStream.copyTo(outputStream)
-                            }
-                        }
-                        tempFile.delete()
-                        runOnUiThread { logMessage("XMP metadata embedded in ${entry.title}") }
+                        writeXmpMetadata(file, entry)
+                        runOnUiThread { logMessage("XMP metadata embedded in $fileName inside $folderPath") }
                     } catch (xmpError: Exception) {
-                        Log.e(TAG, "Failed writing XMP for ${entry.title}", xmpError)
-                        runOnUiThread { logMessage("Failed to write XMP for ${entry.title}") }
+                        Log.e(TAG, "Failed writing XMP for $fileName", xmpError)
+                        runOnUiThread { logMessage("Failed to write XMP for $fileName") }
                     }
-                }
-            } else {
-                val picturesDir = File(
-                    android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
-                    folderPath
-                )
-                if (!picturesDir.exists()) picturesDir.mkdirs()
-                val file = File(picturesDir, fileName)
-                FileOutputStream(file).use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                    outputStream.flush()
-                }
-                try {
-                    writeXmpMetadata(file, entry)
-                    runOnUiThread { logMessage("XMP metadata embedded in ${entry.title}") }
-                } catch (xmpError: Exception) {
-                    Log.e(TAG, "Failed writing XMP for ${entry.title}", xmpError)
-                    runOnUiThread { logMessage("Failed to write XMP for ${entry.title}") }
                 }
             }
         } catch (e: Exception) {
@@ -339,91 +358,73 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { logMessage("Failed saving image for ${entry.title}: ${e.message}") }
         }
     }
-    
-private fun writeXmpMetadata(file: File, entry: MediaEntry) {
-    try {
-        val factory = DocumentBuilderFactory.newInstance()
-        factory.isNamespaceAware = true
-        val builder = factory.newDocumentBuilder()
-        val doc = builder.newDocument()
 
-        val rdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-        val dcNamespace = "http://purl.org/dc/elements/1.1/"
-        val malNamespace = "http://myanimelist.net/"
-        val xmpNamespace = "http://ns.adobe.com/xap/1.0/"
-
-        val rdf = doc.createElementNS(rdfNamespace, "rdf:RDF")
-        rdf.setAttribute("xmlns:rdf", rdfNamespace)
-        rdf.setAttribute("xmlns:dc", dcNamespace)
-        rdf.setAttribute("xmlns:mal", malNamespace)
-        rdf.setAttribute("xmlns:xmp", xmpNamespace)
-        doc.appendChild(rdf)
-
-        val description = doc.createElementNS(rdfNamespace, "rdf:Description")
-        description.setAttribute("rdf:about", "")
-        rdf.appendChild(description)
-
-        // Title, description, creator
-        description.setAttribute("dc:title", entry.title)
-        description.setAttribute("dc:description", entry.synopsis.take(500))
-        description.setAttribute("dc:creator", "MAL Downloader")
-
-        // Create dc:subject with multiple rdf:li tags
-        val dcSubject = doc.createElementNS(dcNamespace, "dc:subject")
-        val rdfBag = doc.createElementNS(rdfNamespace, "rdf:Bag")
-
-        // Add each genre/tag as rdf:li element
-        val allTags = entry.genres + listOf(
-            "Hentai", "M-Finished Airing", "Myanimelist", "Anime News",
-            "Looking For Information On The Anime",
-            "Find Out More With Myanimelist", "Ecchi", "Fantasy",
-            "Anal", "Pussy", "Tits", "Titsjob", "Mother-Son", "Harem",
-            "Ntr", "Netorare", "Blowjob", "Ero", "Yaoi", "Yuri", "Shota"
-        )
-
-        for (tag in allTags) {
-            val rdfLi = doc.createElementNS(rdfNamespace, "rdf:li")
-            rdfLi.textContent = tag
-            rdfBag.appendChild(rdfLi)
+    private fun writeXmpMetadata(file: File, entry: MediaEntry) {
+        try {
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            val builder = factory.newDocumentBuilder()
+            val doc = builder.newDocument()
+            val rdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+            val dcNamespace = "http://purl.org/dc/elements/1.1/"
+            val malNamespace = "http://myanimelist.net/"
+            val xmpNamespace = "http://ns.adobe.com/xap/1.0/"
+            val rdf = doc.createElementNS(rdfNamespace, "rdf:RDF")
+            rdf.setAttribute("xmlns:rdf", rdfNamespace)
+            rdf.setAttribute("xmlns:dc", dcNamespace)
+            rdf.setAttribute("xmlns:mal", malNamespace)
+            rdf.setAttribute("xmlns:xmp", xmpNamespace)
+            doc.appendChild(rdf)
+            val description = doc.createElementNS(rdfNamespace, "rdf:Description")
+            description.setAttribute("rdf:about", "")
+            rdf.appendChild(description)
+            description.setAttribute("dc:title", entry.title)
+            description.setAttribute("dc:description", entry.synopsis.take(500))
+            description.setAttribute("dc:creator", "MAL Downloader")
+            val dcSubject = doc.createElementNS(dcNamespace, "dc:subject")
+            val rdfBag = doc.createElementNS(rdfNamespace, "rdf:Bag")
+            val allTags = entry.genres + entry.customTags + listOf(
+                "Hentai", "M-Finished Airing", "Myanimelist", "Anime News",
+                "Looking For Information On The Anime",
+                "Find Out More With Myanimelist", "Ecchi", "Fantasy",
+                "Anal", "Pussy", "Tits", "Titsjob", "Mother-Son", "Harem",
+                "Ntr", "Netorare", "Blowjob", "Ero", "Yaoi", "Yuri", "Shota"
+            )
+            for (tag in allTags) {
+                val rdfLi = doc.createElementNS(rdfNamespace, "rdf:li")
+                rdfLi.textContent = tag
+                rdfBag.appendChild(rdfLi)
+            }
+            dcSubject.appendChild(rdfBag)
+            description.appendChild(dcSubject)
+            description.setAttribute("mal:id", entry.malId.toString())
+            description.setAttribute("mal:type", entry.type)
+            description.setAttribute("mal:genres", entry.genres.joinToString(", "))
+            description.setAttribute("mal:score", entry.score.toString())
+            description.setAttribute("mal:status", entry.status)
+            description.setAttribute("mal:episodes", entry.episodes.toString())
+            description.setAttribute("mal:year", entry.year.toString())
+            description.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
+            if (entry.isHentai) {
+                description.setAttribute("dc:rights", "Adult Content - Hentai")
+                description.setAttribute("mal:adult", "true")
+            }
+            val transformer = TransformerFactory.newInstance().newTransformer()
+            transformer.setOutputProperty("omit-xml-declaration", "yes")
+            val source = DOMSource(doc)
+            val outputStream = ByteArrayOutputStream()
+            val result = StreamResult(outputStream)
+            transformer.transform(source, result)
+            val xmpString = outputStream.toString("UTF-8")
+            val xmpBytes = xmpString.toByteArray(Charsets.UTF_8)
+            val originalBytes = file.readBytes()
+            val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
+            file.writeBytes(newBytes)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
+            throw e
         }
-
-        dcSubject.appendChild(rdfBag)
-        description.appendChild(dcSubject)
-
-        // Add MAL specific metadata
-        description.setAttribute("mal:id", entry.malId.toString())
-        description.setAttribute("mal:type", entry.type)
-        description.setAttribute("mal:genres", entry.genres.joinToString(", "))
-        description.setAttribute("mal:score", entry.score.toString())
-        description.setAttribute("mal:status", entry.status)
-        description.setAttribute("mal:episodes", entry.episodes.toString())
-        description.setAttribute("mal:year", entry.year.toString())
-        description.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
-
-        if (entry.isHentai) {
-            description.setAttribute("dc:rights", "Adult Content - Hentai")
-            description.setAttribute("mal:adult", "true")
-        }
-
-        val transformer = TransformerFactory.newInstance().newTransformer()
-        transformer.setOutputProperty("omit-xml-declaration", "yes")
-        val source = DOMSource(doc)
-        val outputStream = ByteArrayOutputStream()
-        val result = StreamResult(outputStream)
-        transformer.transform(source, result)
-
-        val xmpString = outputStream.toString("UTF-8")
-        val xmpBytes = xmpString.toByteArray(Charsets.UTF_8)
-
-        val originalBytes = file.readBytes()
-        val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
-
-        file.writeBytes(newBytes)
-    } catch (e: Exception) {
-        Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
-        throw e
     }
-}
 
     private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
         val outputStream = ByteArrayOutputStream()
@@ -461,6 +462,8 @@ private fun writeXmpMetadata(file: File, entry: MediaEntry) {
         }
         return outputStream.toByteArray()
     }
+
+    // TODO: Implement UI for editing/adding/removing custom tags, toggling features, and import/export functionality.
 
     private fun showToast(message: String) {
         runOnUiThread {
