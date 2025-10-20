@@ -1,13 +1,11 @@
 package com.harry.maldownloader
 
 import android.app.Activity
-import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
+import android.util.Xml
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -17,59 +15,34 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.lang.Exception
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
+import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvLogs: TextView
-    private var btnToggleNightMode: Button? = null
-    private var btnLoadXml: Button? = null
-    private var isProcessing = false
+    private lateinit var btnLoadXml: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         try {
-            // Apply theme before super call
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
             super.onCreate(savedInstanceState)
-
-            // Set layout
             setContentView(R.layout.activity_main)
 
-            // Safe view initialization
             tvLogs = findViewById(R.id.tvLogs)
-            btnToggleNightMode = findViewById(R.id.btnToggleNightMode)
             btnLoadXml = findViewById(R.id.btnLoadXml)
 
-            if (tvLogs == null) {
-                Log.e(TAG, "tvLogs not found in layout!")
-                return
+            btnLoadXml.setOnClickListener {
+                openXmlFilePicker()
             }
 
-            btnToggleNightMode?.setOnClickListener {
-                toggleNightMode()
-            }
-
-            btnLoadXml?.setOnClickListener {
-                if (!isProcessing) {
-                    openXmlFilePicker()
-                } else {
-                    showToast("Already processing, please wait...")
-                }
-            }
-
-            logMessage("App launched safely.")
+            logMessage("App ready. Select an XML file to parse.")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error during onCreate: ${e.message}", e)
+            Log.e(TAG, "Error in onCreate", e)
             showToast("Launch error: ${e.localizedMessage}")
         }
-    }
-
-    private fun toggleNightMode() {
-        val currentMode = AppCompatDelegate.getDefaultNightMode()
-        val newMode = if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) AppCompatDelegate.MODE_NIGHT_NO else AppCompatDelegate.MODE_NIGHT_YES
-        AppCompatDelegate.setDefaultNightMode(newMode)
-        showToast("Switched to ${if (newMode == AppCompatDelegate.MODE_NIGHT_YES) "Night" else "Day"} mode")
     }
 
     private fun openXmlFilePicker() {
@@ -77,45 +50,59 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "*/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/xml", "application/xml", "text/plain"))
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/xml", "application/xml"))
             }
             startActivityForResult(intent, REQUEST_CODE_XML)
         } catch (e: Exception) {
-            Log.e(TAG, "Error opening file picker", e)
-            showToast("File picker failed: ${e.message}")
+            showToast("Failed to open file picker: ${e.message}")
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        try {
-            if (requestCode == REQUEST_CODE_XML && resultCode == Activity.RESULT_OK) {
-                val uri = data?.data
-                uri?.let {
-                    logMessage("Selected file: $uri")
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        processFileSafely(uri)
-                    }
-                }
+        if (requestCode == REQUEST_CODE_XML && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { uri ->
+                parseXml(uri)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling activity result", e)
-            showToast("Error opening file: ${e.localizedMessage}")
         }
     }
 
-    private suspend fun processFileSafely(uri: Uri) {
-        try {
-            withContext(Dispatchers.Main) {
-                showToast("Processing file...")
+    private fun parseXml(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream: InputStream? = contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    withContext(Dispatchers.Main) {
+                        showToast("Unable to open selected file.")
+                    }
+                    return@launch
+                }
+
+                val parser = Xml.newPullParser()
+                parser.setInput(inputStream, null)
+
+                var eventType = parser.eventType
+                var animeCount = 0
+                var mangaCount = 0
+
+                while (eventType != XmlPullParser.END_DOCUMENT) {
+                    if (eventType == XmlPullParser.START_TAG) {
+                        when (parser.name?.lowercase()) {
+                            "anime" -> animeCount++
+                            "manga" -> mangaCount++
+                        }
+                    }
+                    eventType = parser.next()
+                }
+
+                withContext(Dispatchers.Main) {
+                    logMessage("XML parsing complete: Found $animeCount anime and $mangaCount manga entries.")
+                }
+            } catch (e: XmlPullParserException) {
+                withContext(Dispatchers.Main) { logMessage("XML parsing error: ${e.message}") }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { logMessage("Error reading XML: ${e.message}") }
             }
-            // Future: Add actual parsing logic here.
-            withContext(Dispatchers.Main) {
-                logMessage("File processed successfully: $uri")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error processing file", e)
-            withContext(Dispatchers.Main) { showToast("File processing error: ${e.localizedMessage}") }
         }
     }
 
