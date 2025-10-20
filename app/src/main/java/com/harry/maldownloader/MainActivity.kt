@@ -359,6 +359,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun sanitizeForFilename(input: String): String {
+    // Normalize Unicode and remove accents
+    val normalized = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD)
+        .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+
+    // Remove characters not allowed in filenames (keep letters, digits, _ and -)
+    val sanitized = normalized.replace("[^\\w\\s-]".toRegex(), "")
+
+    // Replace spaces with underscores and convert to lowercase for consistency
+    return sanitized.trim().replace("\\s+".toRegex(), "_").lowercase()
+    }
+
     private fun writeXmpMetadata(file: File, entry: MediaEntry) {
         try {
             val factory = DocumentBuilderFactory.newInstance()
