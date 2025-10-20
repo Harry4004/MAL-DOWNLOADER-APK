@@ -430,7 +430,53 @@ class MainActivity : AppCompatActivity() {
             
             // Embed XMP in JPEG file
             val originalBytes = file.readBytes()
-            val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
+            val newBytes = embprivate fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
+    val outputStream = ByteArrayOutputStream()
+    
+    try {
+        // Write JPEG SOI marker
+        outputStream.write(0xFF)
+        outputStream.write(0xD8)
+        
+        // Create XMP APP1 segment
+        val xmpHeader = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(Charsets.UTF_8)
+        val segmentSize = xmpHeader.size + xmpBytes.size + 2 // +2 for length bytes
+        
+        if (segmentSize <= 65535) { // APP1 segment size limit
+            outputStream.write(0xFF) // APP1 marker
+            outputStream.write(0xE1)
+            outputStream.write(segmentSize shr 8) // Length high byte
+            outputStream.write(segmentSize and 0xFF) // Length low byte
+            outputStream.write(xmpHeader)
+            outputStream.write(xmpBytes)
+        }
+        
+        // Write rest of JPEG (skip original SOI)
+        var i = 2
+        while (i < jpegBytes.size) {
+            if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) {
+                val marker = jpegBytes[i + 1].toInt() and 0xFF
+                if (marker == 0xE1) { // Skip existing APP1 segments to avoid duplicates
+                    i += 2
+                    if (i + 1 < jpegBytes.size) {
+                        val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF)
+                        i += segLen
+                        continue
+                    }
+                }
+            }
+            outputStream.write(jpegBytes[i].toInt() and 0xFF)
+            i++
+        }
+        
+    } catch (e: Exception) {
+        Log.e(TAG, "Error embedding XMP", e)
+        return jpegBytes // Return original if embedding fails
+    }
+    
+    return outputStream.toByteArray()
+}
+edXmpInJpeg(originalBytes, xmpBytes)
             
             file.writeBytes(newBytes)
             
@@ -440,49 +486,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
-        val outputStream = ByteArrayOutputStream()
-        
-        try {
-            // Write JPEG SOI marker
-            outputStream.write(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
-            
-            // Create XMP APP1 segment
-            val xmpHeader = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(Charsets.UTF_8)
-            val segmentSize = xmpHeader.size + xmpBytes.size + 2 // +2 for length bytes
-            
-            if (segmentSize <= 65535) { // APP1 segment size limit
-                outputStream.write(byteArrayOf(0xFF.toByte(), 0xE1.toByte())) // APP1 marker
-                outputStream.write(byteArrayOf((segmentSize shr 8).toByte(), (segmentSize and 0xFF).toByte()))
-                outputStream.write(xmpHeader)
-                outputStream.write(xmpBytes)
-            }
-            
-            // Write rest of JPEG (skip original SOI)
-            var i = 2
-            while (i < jpegBytes.size) {
-                if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) {
-                    val marker = jpegBytes[i + 1].toInt() and 0xFF
-                    if (marker == 0xE1) { // Skip existing APP1 segments to avoid duplicates
-                        i += 2
-                        if (i + 1 < jpegBytes.size) {
-                            val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF)
-                            i += segLen
-                            continue
-                        }
-                    }
-                }
-                outputStream.write(jpegBytes[i])
-                i++
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error embedding XMP", e)
-            return jpegBytes // Return original if embedding fails
-        }
-        
-        return outputStream.toByteArray()
-    }
+
 
     private fun showToast(message: String) {
         runOnUiThread {
