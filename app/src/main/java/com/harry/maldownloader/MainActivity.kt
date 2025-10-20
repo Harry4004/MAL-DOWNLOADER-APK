@@ -2,7 +2,9 @@ package com.harry.maldownloader
 
 import android.app.Activity
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,10 +17,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -29,6 +28,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.text.Normalizer
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.TransformerFactory
@@ -40,7 +41,7 @@ data class MediaEntry(
     val title: String,
     val type: String,
     val genres: List<String> = emptyList(),
-    val customTags: List<String> = emptyList(), // <-- Custom tags
+    val customTags: List<String> = emptyList(),
     val isHentai: Boolean = false,
     val synopsis: String = "",
     val score: Float = 0f,
@@ -50,6 +51,7 @@ data class MediaEntry(
 )
 
 class MainActivity : AppCompatActivity() {
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -59,10 +61,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLogs: TextView
     private lateinit var btnLoadXml: Button
 
-    // Demo custom tags database: replace with real persistence/database
-    private val animeCustomTags = mutableListOf<String>()
-    private val mangaCustomTags = mutableListOf<String>()
-    private val hentaiCustomTags = mutableListOf<String>()
+    private lateinit var sharedPrefs: SharedPreferences
+
+    // In-memory map of saved files to avoid duplicates: malId -> saved file paths
+    private val savedFileIndex = ConcurrentHashMap<Int, MutableSet<String>>()
+
+    // Coroutine scope and a queue for sequential saving
+    private val saveScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
@@ -72,13 +77,65 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
         btnLoadXml = findViewById(R.id.btnLoadXml)
 
+        sharedPrefs = getSharedPreferences("CustomTagsPrefs", Context.MODE_PRIVATE)
+
         btnLoadXml.setOnClickListener {
             openXmlFilePicker()
         }
 
+        loadSavedFileIndex()
+        loadCustomTagsFromPrefs()
+
         logMessage("App ready. Select an XML file to parse.")
     }
 
+    // --- Sanitization Utility ---
+    private fun sanitizeForFilename(input: String): String {
+        val normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        val sanitized = normalized.replace("[^\\w\\s-]".toRegex(), "")
+        return sanitized.trim().replace("\\s+".toRegex(), "_").lowercase()
+    }
+
+    // --- Custom Tags Persistence ---
+    private val animeCustomTags = mutableListOf<String>()
+    private val mangaCustomTags = mutableListOf<String>()
+    private val hentaiCustomTags = mutableListOf<String>()
+
+    private fun loadCustomTagsFromPrefs() {
+        animeCustomTags.clear()
+        animeCustomTags.addAll(sharedPrefs.getStringSet("animeCustomTags", emptySet()) ?: emptySet())
+        mangaCustomTags.clear()
+        mangaCustomTags.addAll(sharedPrefs.getStringSet("mangaCustomTags", emptySet()) ?: emptySet())
+        hentaiCustomTags.clear()
+        hentaiCustomTags.addAll(sharedPrefs.getStringSet("hentaiCustomTags", emptySet()) ?: emptySet())
+    }
+
+    private fun saveCustomTagsToPrefs() {
+        sharedPrefs.edit()
+            .putStringSet("animeCustomTags", animeCustomTags.toSet())
+            .putStringSet("mangaCustomTags", mangaCustomTags.toSet())
+            .putStringSet("hentaiCustomTags", hentaiCustomTags.toSet())
+            .apply()
+    }
+
+    // --- Saved Files Deduplication Index ---
+    private fun loadSavedFileIndex() {
+        // TODO: Implement persistent file index loading from JSON or DB if needed
+        // For now, start with empty in-memory map
+        savedFileIndex.clear()
+    }
+
+    private fun addToFileIndex(malId: Int, filePath: String) {
+        val set = savedFileIndex.getOrPut(malId) { mutableSetOf() }
+        set.add(filePath)
+    }
+
+    private fun isDuplicate(malId: Int, filePath: String): Boolean {
+        return savedFileIndex[malId]?.contains(filePath) ?: false
+    }
+
+    // --- File Picker ---
     private fun openXmlFilePicker() {
         try {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -95,9 +152,7 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_XML && resultCode == Activity.RESULT_OK) {
-            data?.data?.let { uri ->
-                parseXml(uri)
-            }
+            data?.data?.let { uri -> parseXml(uri) }
         }
     }
 
@@ -106,9 +161,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val inputStream: InputStream? = contentResolver.openInputStream(uri)
                 if (inputStream == null) {
-                    withContext(Dispatchers.Main) {
-                        showToast("Unable to open selected file.")
-                    }
+                    withContext(Dispatchers.Main) { showToast("Unable to open selected file.") }
                     return@launch
                 }
                 val parser = Xml.newPullParser()
@@ -135,9 +188,7 @@ class MainActivity : AppCompatActivity() {
                         delay(1200)
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed processing ${entry.title}", e)
-                        withContext(Dispatchers.Main) {
-                            logMessage("Failed to process ${entry.title}")
-                        }
+                        withContext(Dispatchers.Main) { logMessage("Failed to process ${entry.title}") }
                     }
                 }
             } catch (e: XmlPullParserException) {
@@ -167,7 +218,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing $type entry", e)
         }
-        // Merge with custom tags per media type
         val customTags = when (type.lowercase()) {
             "anime" -> animeCustomTags
             "hentai" -> hentaiCustomTags
@@ -277,12 +327,32 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 response.body?.byteStream()?.use { inputStream ->
-                    saveImageWithXmp(inputStream, entry)
+                    enqueueSave(inputStream, entry)
                 }
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 logMessage("Error downloading cover for ${entry.title}: ${e.message}")
+            }
+        }
+    }
+
+    // --- Serialize save operations to avoid race conditions ---
+    private val saveQueue = MutableList(1) { CompletableDeferred<Unit>() } // initial dummy deferred
+
+    private fun enqueueSave(inputStream: InputStream, entry: MediaEntry) {
+        val deferred = CompletableDeferred<Unit>()
+        val previous = saveQueue.last()
+        saveQueue.add(deferred)
+
+        saveScope.launch {
+            previous.await()
+            try {
+                saveImageWithXmp(inputStream, entry)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving image with XMP", e)
+            } finally {
+                deferred.complete(Unit)
             }
         }
     }
@@ -296,79 +366,101 @@ class MainActivity : AppCompatActivity() {
                 entry.type == "manga" -> "Manga"
                 else -> "Misc"
             }
+
+            // Only save under first genre/custom folder to deduplicate physically
             val folderTags = (entry.genres + entry.customTags).distinct()
-            for (genre in folderTags) {
-                val sanitizedGenre = genre.replace(Regex("[^\\w\\s-]"), "_").replace(" ", "_")
-                val folderPath = "$baseDir/$typeFolder/$sanitizedGenre"
-                val fileName = "${entry.title.replace(Regex("[^\\w\\s-]"), "_").take(30)}_${entry.malId}.jpg"
-                if (Build.VERSION.SDK_INT >= 29) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/$folderPath")
-                    }
-                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                    uri?.let { imageUri ->
-                        contentResolver.openOutputStream(imageUri)?.use { outputStream ->
-                            inputStream.copyTo(outputStream)
-                            outputStream.flush()
-                        }
-                        try {
-                            val tempFile = File(cacheDir, fileName)
-                            contentResolver.openInputStream(uri)?.use { uriInputStream ->
-                                tempFile.outputStream().use { tempOutputStream ->
-                                    uriInputStream.copyTo(tempOutputStream)
-                                }
-                            }
-                            writeXmpMetadata(tempFile, entry)
-                            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                                tempFile.inputStream().use { tempInputStream ->
-                                    tempInputStream.copyTo(outputStream)
-                                }
-                            }
-                            tempFile.delete()
-                            runOnUiThread { logMessage("XMP metadata embedded in $fileName inside $folderPath") }
-                        } catch (xmpError: Exception) {
-                            Log.e(TAG, "Failed writing XMP for $fileName", xmpError)
-                            runOnUiThread { logMessage("Failed to write XMP for $fileName") }
-                        }
-                    }
-                } else {
-                    val picturesDir = File(
-                        android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
-                        folderPath
-                    )
-                    if (!picturesDir.exists()) picturesDir.mkdirs()
-                    val file = File(picturesDir, fileName)
-                    FileOutputStream(file).use { outputStream ->
+            val primaryGenre = folderTags.firstOrNull() ?: "Unknown"
+            val sanitizedGenre = sanitizeForFilename(primaryGenre)
+            val folderPath = "$baseDir/$typeFolder/$sanitizedGenre"
+            val fileName = "${sanitizeForFilename(entry.title).take(30)}_${entry.malId}.jpg"
+
+            // Check duplication (skip save if already saved)
+            if (isDuplicate(entry.malId, fileName)) {
+                runOnUiThread {
+                    logMessage("Skipping save, duplicate detected for ${entry.title} in $folderPath")
+                }
+                return
+            }
+
+            if (Build.VERSION.SDK_INT >= 29) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/$folderPath")
+                }
+                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+
+                uri?.let { imageUri ->
+                    contentResolver.openOutputStream(imageUri)?.use { outputStream ->
                         inputStream.copyTo(outputStream)
                         outputStream.flush()
                     }
+
                     try {
-                        writeXmpMetadata(file, entry)
-                        runOnUiThread { logMessage("XMP metadata embedded in $fileName inside $folderPath") }
+                        val tempFile = File(cacheDir, fileName)
+                        contentResolver.openInputStream(uri)?.use { uriInputStream ->
+                            tempFile.outputStream().use { tempOutputStream ->
+                                uriInputStream.copyTo(tempOutputStream)
+                            }
+                        }
+
+                        writeXmpMetadata(tempFile, entry)
+
+                        contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            tempFile.inputStream().use { tempInputStream ->
+                                tempInputStream.copyTo(outputStream)
+                            }
+                        }
+
+                        tempFile.delete()
+
+                        addToFileIndex(entry.malId, fileName)
+
+                        runOnUiThread {
+                            logMessage("XMP embedded and saved: $fileName inside $folderPath")
+                        }
                     } catch (xmpError: Exception) {
-                        Log.e(TAG, "Failed writing XMP for $fileName", xmpError)
-                        runOnUiThread { logMessage("Failed to write XMP for $fileName") }
+                        Log.e(TAG, "Failed rewriting XMP for $fileName", xmpError)
+                        runOnUiThread { logMessage("Failed to update XMP for $fileName") }
                     }
+                }
+            } else {
+                val picturesDir = File(
+                    android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
+                    folderPath
+                )
+                if (!picturesDir.exists()) picturesDir.mkdirs()
+
+                val file = File(picturesDir, fileName)
+                FileOutputStream(file).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                    outputStream.flush()
+                }
+
+                try {
+                    writeXmpMetadata(file, entry)
+
+                    addToFileIndex(entry.malId, fileName)
+
+                    runOnUiThread {
+                        logMessage("XMP embedded and saved: $fileName inside $folderPath")
+                    }
+                } catch (xmpError: Exception) {
+                    Log.e(TAG, "Failed writing XMP for $fileName", xmpError)
+                    runOnUiThread { logMessage("Failed writing XMP for $fileName") }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving image for ${entry.title}", e)
-            runOnUiThread { logMessage("Failed saving image for ${entry.title}: ${e.message}") }
+            runOnUiThread { logMessage("Failed to save image for ${entry.title}: ${e.message}") }
         }
     }
 
-    private fun sanitizeForFilename(input: String): String {
-    // Normalize Unicode and remove accents
-    val normalized = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD)
-        .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+    private fun isDuplicate(malId: Int, fileName: String) = savedFileIndex[malId]?.contains(fileName) ?: false
 
-    // Remove characters not allowed in filenames (keep letters, digits, _ and -)
-    val sanitized = normalized.replace("[^\\w\\s-]".toRegex(), "")
-
-    // Replace spaces with underscores and convert to lowercase for consistency
-    return sanitized.trim().replace("\\s+".toRegex(), "_").lowercase()
+    private fun addToFileIndex(malId: Int, fileName: String) {
+        val set = savedFileIndex.getOrPut(malId) { mutableSetOf() }
+        set.add(fileName)
     }
 
     private fun writeXmpMetadata(file: File, entry: MediaEntry) {
@@ -474,8 +566,6 @@ class MainActivity : AppCompatActivity() {
         }
         return outputStream.toByteArray()
     }
-
-    // TODO: Implement UI for editing/adding/removing custom tags, toggling features, and import/export functionality.
 
     private fun showToast(message: String) {
         runOnUiThread {
