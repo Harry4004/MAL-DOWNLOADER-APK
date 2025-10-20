@@ -339,54 +339,91 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { logMessage("Failed saving image for ${entry.title}: ${e.message}") }
         }
     }
+    
+private fun writeXmpMetadata(file: File, entry: MediaEntry) {
+    try {
+        val factory = DocumentBuilderFactory.newInstance()
+        factory.isNamespaceAware = true
+        val builder = factory.newDocumentBuilder()
+        val doc = builder.newDocument()
 
-    private fun writeXmpMetadata(file: File, entry: MediaEntry) {
-        try {
-            val factory = DocumentBuilderFactory.newInstance()
-            factory.isNamespaceAware = true
-            val builder = factory.newDocumentBuilder()
-            val doc = builder.newDocument()
-            val rdf = doc.createElementNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:RDF")
-            rdf.setAttribute("xmlns:rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
-            rdf.setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/")
-            rdf.setAttribute("xmlns:mal", "http://myanimelist.net/")
-            rdf.setAttribute("xmlns:xmp", "http://ns.adobe.com/xap/1.0/")
-            doc.appendChild(rdf)
-            val description = doc.createElementNS("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:Description")
-            description.setAttribute("rdf:about", "")
-            rdf.appendChild(description)
-            description.setAttribute("dc:title", entry.title)
-            description.setAttribute("dc:description", entry.synopsis.take(500))
-            description.setAttribute("dc:creator", "MAL Downloader")
-            description.setAttribute("dc:subject", entry.genres.joinToString(", "))
-            description.setAttribute("mal:id", entry.malId.toString())
-            description.setAttribute("mal:type", entry.type)
-            description.setAttribute("mal:genres", entry.genres.joinToString(", "))
-            description.setAttribute("mal:score", entry.score.toString())
-            description.setAttribute("mal:status", entry.status)
-            description.setAttribute("mal:episodes", entry.episodes.toString())
-            description.setAttribute("mal:year", entry.year.toString())
-            description.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
-            if (entry.isHentai) {
-                description.setAttribute("dc:rights", "Adult Content - Hentai")
-                description.setAttribute("mal:adult", "true")
-            }
-            val transformer = TransformerFactory.newInstance().newTransformer()
-            transformer.setOutputProperty("omit-xml-declaration", "yes")
-            val source = DOMSource(doc)
-            val outputStream = ByteArrayOutputStream()
-            val result = StreamResult(outputStream)
-            transformer.transform(source, result)
-            val xmpString = outputStream.toString("UTF-8")
-            val xmpBytes = xmpString.toByteArray(Charsets.UTF_8)
-            val originalBytes = file.readBytes()
-            val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
-            file.writeBytes(newBytes)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
-            throw e
+        val rdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        val dcNamespace = "http://purl.org/dc/elements/1.1/"
+        val malNamespace = "http://myanimelist.net/"
+        val xmpNamespace = "http://ns.adobe.com/xap/1.0/"
+
+        val rdf = doc.createElementNS(rdfNamespace, "rdf:RDF")
+        rdf.setAttribute("xmlns:rdf", rdfNamespace)
+        rdf.setAttribute("xmlns:dc", dcNamespace)
+        rdf.setAttribute("xmlns:mal", malNamespace)
+        rdf.setAttribute("xmlns:xmp", xmpNamespace)
+        doc.appendChild(rdf)
+
+        val description = doc.createElementNS(rdfNamespace, "rdf:Description")
+        description.setAttribute("rdf:about", "")
+        rdf.appendChild(description)
+
+        // Title, description, creator
+        description.setAttribute("dc:title", entry.title)
+        description.setAttribute("dc:description", entry.synopsis.take(500))
+        description.setAttribute("dc:creator", "MAL Downloader")
+
+        // Create dc:subject with multiple rdf:li tags
+        val dcSubject = doc.createElementNS(dcNamespace, "dc:subject")
+        val rdfBag = doc.createElementNS(rdfNamespace, "rdf:Bag")
+
+        // Add each genre/tag as rdf:li element
+        val allTags = entry.genres + listOf(
+            "Hentai", "M-Finished Airing", "Myanimelist", "Anime News",
+            "Looking For Information On The Anime",
+            "Find Out More With Myanimelist", "Ecchi", "Fantasy",
+            "Anal", "Pussy", "Tits", "Titsjob", "Mother-Son", "Harem",
+            "Ntr", "Netorare", "Blowjob", "Ero", "Yaoi", "Yuri", "Shota"
+        )
+
+        for (tag in allTags) {
+            val rdfLi = doc.createElementNS(rdfNamespace, "rdf:li")
+            rdfLi.textContent = tag
+            rdfBag.appendChild(rdfLi)
         }
+
+        dcSubject.appendChild(rdfBag)
+        description.appendChild(dcSubject)
+
+        // Add MAL specific metadata
+        description.setAttribute("mal:id", entry.malId.toString())
+        description.setAttribute("mal:type", entry.type)
+        description.setAttribute("mal:genres", entry.genres.joinToString(", "))
+        description.setAttribute("mal:score", entry.score.toString())
+        description.setAttribute("mal:status", entry.status)
+        description.setAttribute("mal:episodes", entry.episodes.toString())
+        description.setAttribute("mal:year", entry.year.toString())
+        description.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
+
+        if (entry.isHentai) {
+            description.setAttribute("dc:rights", "Adult Content - Hentai")
+            description.setAttribute("mal:adult", "true")
+        }
+
+        val transformer = TransformerFactory.newInstance().newTransformer()
+        transformer.setOutputProperty("omit-xml-declaration", "yes")
+        val source = DOMSource(doc)
+        val outputStream = ByteArrayOutputStream()
+        val result = StreamResult(outputStream)
+        transformer.transform(source, result)
+
+        val xmpString = outputStream.toString("UTF-8")
+        val xmpBytes = xmpString.toByteArray(Charsets.UTF_8)
+
+        val originalBytes = file.readBytes()
+        val newBytes = embedXmpInJpeg(originalBytes, xmpBytes)
+
+        file.writeBytes(newBytes)
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
+        throw e
     }
+}
 
     private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
         val outputStream = ByteArrayOutputStream()
