@@ -14,9 +14,9 @@ import androidx.room.TypeConverters
 @TypeConverters(DownloadConverters::class)
 abstract class DownloadDatabase : RoomDatabase() {
     abstract fun animeEntryDao(): AnimeEntryDao
-    abstract fun downloadDao(): DownloadItemDao
+    abstract fun downloadDao(): DownloadDao
     abstract fun logDao(): DownloadLogDao
-    abstract fun duplicateDao(): DuplicateHashDao
+    abstract fun duplicateDao(): DuplicateDao
 
     companion object {
         @Volatile
