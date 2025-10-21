@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -26,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.EntriesList
 import com.harry.maldownloader.ui.components.TagManagerDialog
@@ -34,38 +32,37 @@ import com.harry.maldownloader.ui.theme.MaldownloaderTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    
+
     private lateinit var viewModel: MainViewModel
     private lateinit var repository: DownloadRepository
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Initialize repository and ViewModel
         repository = DownloadRepository(
             context = this,
             database = DownloadRepository.getDatabase(this)
         )
-        
+
         viewModel = ViewModelProvider(
             this,
             MainViewModelFactory(repository)
         )[MainViewModel::class.java]
-        
+
         setContent {
             MaldownloaderTheme {
                 MainScreen(viewModel = viewModel)
             }
         }
-        
+
         // Check and request permissions
         checkPermissions()
     }
-    
+
     private fun checkPermissions() {
         val permissions = mutableListOf<String>()
-        
-        // Storage permission
+
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.READ_EXTERNAL_STORAGE
@@ -73,8 +70,7 @@ class MainActivity : ComponentActivity() {
         ) {
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-        
-        // Write external storage for older versions
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -84,8 +80,7 @@ class MainActivity : ComponentActivity() {
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
         }
-        
-        // Media permissions (Android 13+)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -94,8 +89,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
             }
-            
-            // Notification permission
+
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
@@ -104,28 +98,28 @@ class MainActivity : ComponentActivity() {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        
+
         if (permissions.isNotEmpty()) {
             requestPermissions(permissions.toTypedArray(), 1001)
         }
     }
-    
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
-        permissions: Array<out String>,
+        permissions: Array<String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
+
         if (requestCode == 1001) {
             permissions.forEachIndexed { index, permission ->
-                val granted = grantResults[index] == PackageManager.PERMISSION_GRANTED
+                val granted = grantResults.getOrNull(index) == PackageManager.PERMISSION_GRANTED
                 when (permission) {
-                    Manifest.permission.POST_NOTIFICATIONS -> 
+                    Manifest.permission.POST_NOTIFICATIONS ->
                         viewModel.setNotificationPermission(granted)
                     Manifest.permission.READ_EXTERNAL_STORAGE,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_MEDIA_IMAGES -> 
+                    Manifest.permission.READ_MEDIA_IMAGES ->
                         viewModel.setStoragePermission(granted)
                 }
             }
@@ -137,27 +131,27 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
+    val activity = context as ComponentActivity
+    val scope = rememberCoroutineScope()
+
     val isProcessing by viewModel.isProcessing.collectAsState()
     val animeEntries by viewModel.animeEntries.collectAsState()
     val downloads by viewModel.downloads.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val customTags by viewModel.customTags.collectAsState()
-    
+
     var showTagManager by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("🎥 Import", "📁 Entries", "⬇️ Downloads", "📝 Logs")
-    
-    // File picker launcher
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            viewModel.viewModelScope.launch {
-                viewModel.processMalFile(context, it)
-            }
+            scope.launch { viewModel.processMalFile(activity, it) }
         }
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -209,7 +203,6 @@ fun MainScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Tab Bar
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 modifier = Modifier.fillMaxWidth(),
@@ -228,8 +221,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     )
                 }
             }
-            
-            // Content based on selected tab
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -260,8 +252,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
     }
-    
-    // Tag Manager Dialog
+
     if (showTagManager) {
         TagManagerDialog(
             viewModel = viewModel,
@@ -281,7 +272,6 @@ fun ImportTab(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Client ID Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -308,10 +298,9 @@ fun ImportTab(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
-        // Import Button
+
         Button(
             onClick = onImportClick,
             modifier = Modifier
@@ -333,10 +322,9 @@ fun ImportTab(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
-        // Features info
+
         Card(
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -348,9 +336,9 @@ fun ImportTab(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 val features = listOf(
                     "✅ 25+ Dynamic tags from MAL/Jikan API",
                     "✅ Comprehensive XMP metadata embedding",
@@ -361,7 +349,7 @@ fun ImportTab(
                     "✅ Rate-limited API calls",
                     "✅ Duplicate prevention"
                 )
-                
+
                 features.forEach { feature ->
                     Text(
                         text = feature,
@@ -379,8 +367,8 @@ fun EntriesTab(
     viewModel: MainViewModel,
     entries: List<com.harry.maldownloader.data.AnimeEntry>
 ) {
+    val scope = rememberCoroutineScope()
     Column {
-        // Stats header
         if (entries.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth()
@@ -400,7 +388,7 @@ fun EntriesTab(
                         )
                         Text("Entries", style = MaterialTheme.typography.bodySmall)
                     }
-                    
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val totalTags = entries.sumOf { it.allTags.size }
                         Text(
@@ -411,7 +399,7 @@ fun EntriesTab(
                         )
                         Text("Total Tags", style = MaterialTheme.typography.bodySmall)
                     }
-                    
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val avgTags = if (entries.isNotEmpty()) entries.sumOf { it.allTags.size } / entries.size else 0
                         Text(
@@ -422,7 +410,7 @@ fun EntriesTab(
                         )
                         Text("Avg Tags", style = MaterialTheme.typography.bodySmall)
                     }
-                    
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val hentaiCount = entries.count { it.isHentai }
                         Text(
@@ -435,18 +423,15 @@ fun EntriesTab(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
         }
-        
-        // Entries List
+
         EntriesList(
             viewModel = viewModel,
             entries = entries,
             onDownloadClick = { entry ->
-                viewModel.viewModelScope.launch {
-                    viewModel.downloadImages(entry)
-                }
+                scope.launch { viewModel.downloadImages(entry) }
             }
         )
     }
@@ -479,7 +464,6 @@ fun DownloadsTab(
         }
     } else {
         Column {
-            // Download stats
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -495,10 +479,9 @@ fun DownloadsTab(
                     DownloadStat("Failed", downloads.count { it.status == "failed" }.toString(), MaterialTheme.colorScheme.error)
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
-            // Download items would go here (simplified for now)
+
             Text(
                 text = "Download management UI will be enhanced in future updates",
                 style = MaterialTheme.typography.bodyMedium,
@@ -530,7 +513,6 @@ fun LogsTab(
     logs: List<String>
 ) {
     Column {
-        // Clear logs button
         if (logs.isNotEmpty()) {
             Button(
                 onClick = { viewModel.clearLogs() },
@@ -540,11 +522,10 @@ fun LogsTab(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Clear Logs (${logs.size})")
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
         }
-        
-        // Logs display
+
         Card(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -579,7 +560,6 @@ fun LogsTab(
     }
 }
 
-// ViewModel Factory
 class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
