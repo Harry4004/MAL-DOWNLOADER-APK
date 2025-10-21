@@ -1,14 +1,54 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme with day/night support -->
     <style name="Theme.MALDownloader" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#6200EE</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#BB86FC</item>
-        <item name="colorOnPrimaryContainer">#000000</item>
-        <item name="colorSecondary">#03DAC6</item>
-        <item name="colorOnSecondary">#000000</item>
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/purple_200</item>
+        <item name="colorOnPrimaryContainer">@color/black</item>
+        
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/teal_200</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="colorSecondaryContainer">#E0F2F1</item>
+        <item name="colorOnSecondaryContainer">#004D40</item>
+        
+        <!-- Surface colors -->
+        <item name="colorSurface">?android:attr/windowBackground</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorSurfaceVariant">#F5F5F5</item>
+        <item name="colorOnSurfaceVariant">#666666</item>
+        
+        <!-- Error colors -->
+        <item name="colorError">@color/accent_red</item>
+        <item name="colorOnError">@color/white</item>
+        
+        <!-- System bars -->
         <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimary</item>
-        <item name="android:windowBackground">#FFFFFF</item>
-        <item name="android:textColorPrimary">#000000</item>
-        <item name="android:textColorSecondary">#666666</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">?attr/colorSurface</item>
+        
+        <!-- Background -->
+        <item name="android:windowBackground">?android:attr/windowBackground</item>
+        <item name="android:textColorPrimary">?android:attr/textColorPrimary</item>
+        <item name="android:textColorSecondary">?android:attr/textColorSecondary</item>
+        
+        <!-- Custom attributes -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+    
+    <!-- Button style for consistent theming -->
+    <style name="Theme.MALDownloader.Button" parent="Widget.Material3.Button">
+        <item name="android:layout_margin">8dp</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+    
+    <!-- Log text style -->
+    <style name="Theme.MALDownloader.LogText" parent="@android:style/TextAppearance.Material.Body1">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
     </style>
 </resources>
