@@ -151,7 +151,7 @@ fun LibraryStatsCard(entries: List<AnimeEntry>) {
             Spacer(modifier = Modifier.height(12.dp))
             
             val avgScore = entries.mapNotNull { it.score.takeIf { score -> score > 0 } }.average()
-            val totalEpisodes = entries.sumOf { it.episodesWatched }
+            val totalEpisodes = entries.sumOf { it.episodesWatched ?: 0 }
             
             StatRow("Average Score", if (avgScore.isNaN()) "N/A" else "%.1f".format(avgScore))
             StatRow("Total Episodes", totalEpisodes.toString())
