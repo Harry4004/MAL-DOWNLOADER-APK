@@ -1,7 +1,6 @@
 package com.harry.maldownloader.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -60,8 +59,8 @@ fun ItemDetailsBottomSheet(
                 Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 DetailRowShared("Type", entry.type)
-                DetailRowShared("Episodes", "${entry.episodesWatched}/${entry.totalEpisodes ?: "?"}")
-                DetailRowShared("Score", "${entry.score}/10")
+                DetailRowShared("Episodes", "${entry.episodesWatched ?: 0}/${entry.totalEpisodes ?: "?"}")
+                DetailRowShared("Score", "${entry.score ?: 0f}/10")
                 entry.status?.let { DetailRowShared("Status", it) }
                 entry.startDate?.let { DetailRowShared("Started", it) }
                 entry.endDate?.let { DetailRowShared("Finished", it) }
@@ -81,7 +80,8 @@ fun ItemDetailsBottomSheet(
                 }
             }
         }
-        if (!entry.tags.isNullOrEmpty()) {
+        val tagsText = (entry.tags ?: emptyList()).joinToString(", ")
+        if (tagsText.isNotBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -91,7 +91,7 @@ fun ItemDetailsBottomSheet(
                         Text("Tags", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(entry.tags!!, style = MaterialTheme.typography.bodyMedium)
+                    Text(tagsText, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -117,5 +117,16 @@ fun ItemDetailsBottomSheet(
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+fun DetailRowShared(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
