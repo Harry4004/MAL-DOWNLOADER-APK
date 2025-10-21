@@ -62,8 +62,19 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
+    // Custom tags management
+    private val _customTags = MutableStateFlow<List<String>>(emptyList())
+    val customTags: StateFlow<List<String>> = _customTags.asStateFlow()
+    
+    private val animeCustomTags = mutableSetOf<String>()
+    private val mangaCustomTags = mutableSetOf<String>()
+    private val hentaiCustomTags = mutableSetOf<String>()
+    
+    private val sharedPrefs = getApplication<Application>().getSharedPreferences("MALDownloaderPrefs", Context.MODE_PRIVATE)
+
     init {
         checkInitialPermissions()
+        loadCustomTags()
         loadEntries()
         loadDownloads()
         loadLogs()
@@ -89,11 +100,57 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
         _storagePermissionGranted.postValue(storageGranted)
     }
 
+    // Custom Tags Management
+    private fun loadCustomTags() {
+        animeCustomTags.clear()
+        animeCustomTags.addAll(sharedPrefs.getStringSet("animeCustomTags", emptySet()) ?: emptySet())
+        mangaCustomTags.clear()
+        mangaCustomTags.addAll(sharedPrefs.getStringSet("mangaCustomTags", emptySet()) ?: emptySet())
+        hentaiCustomTags.clear()
+        hentaiCustomTags.addAll(sharedPrefs.getStringSet("hentaiCustomTags", emptySet()) ?: emptySet())
+        updateCustomTagsFlow()
+    }
+    
+    private fun saveCustomTags() {
+        sharedPrefs.edit()
+            .putStringSet("animeCustomTags", animeCustomTags)
+            .putStringSet("mangaCustomTags", mangaCustomTags)
+            .putStringSet("hentaiCustomTags", hentaiCustomTags)
+            .apply()
+        updateCustomTagsFlow()
+    }
+    
+    private fun updateCustomTagsFlow() {
+        val allTags = mutableListOf<String>()
+        allTags.addAll(animeCustomTags.map { "Anime: $it" })
+        allTags.addAll(mangaCustomTags.map { "Manga: $it" })
+        allTags.addAll(hentaiCustomTags.map { "Hentai: $it" })
+        _customTags.value = allTags
+    }
+    
+    fun addCustomTag(type: String, tag: String) {
+        when (type.lowercase()) {
+            "anime" -> animeCustomTags.add(tag)
+            "manga" -> mangaCustomTags.add(tag)
+            "hentai" -> hentaiCustomTags.add(tag)
+        }
+        saveCustomTags()
+    }
+    
+    fun removeCustomTag(fullTag: String) {
+        when {
+            fullTag.startsWith("Anime: ") -> animeCustomTags.remove(fullTag.removePrefix("Anime: "))
+            fullTag.startsWith("Manga: ") -> mangaCustomTags.remove(fullTag.removePrefix("Manga: "))
+            fullTag.startsWith("Hentai: ") -> hentaiCustomTags.remove(fullTag.removePrefix("Hentai: "))
+        }
+        saveCustomTags()
+    }
+
     // Core app functions - IMPLEMENTED MAL XML PROCESSING
     suspend fun processMalFile(context: Context, uri: Uri) {
         _isProcessing.value = true
         try {
-            log("🚀 Starting MAL file processing...")
+            log("🚀 Starting MAL file processing with Client ID: ${MAL_CLIENT_ID.take(8)}...")
             
             val entries = withContext(Dispatchers.IO) {
                 parseMalXml(context, uri)
@@ -109,6 +166,14 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
                     val enrichedEntry = enrichWithApiData(entry)
                     
                     if (enrichedEntry != null) {
+                        // Update the entry in the list with enriched data
+                        val updatedEntries = _animeEntries.value.toMutableList()
+                        val entryIndex = updatedEntries.indexOfFirst { it.malId == entry.malId }
+                        if (entryIndex != -1) {
+                            updatedEntries[entryIndex] = enrichedEntry
+                            _animeEntries.value = updatedEntries
+                        }
+                        
                         downloadImages(enrichedEntry)
                         delay(1500) // Rate limiting
                     }
@@ -279,8 +344,18 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
             producer.name?.let { allTags.add("Producer: $it") }
         }
         
-        // User tags with prefixes
+        // Detect hentai content
         val isHentai = allTags.any { it.contains("Hentai", true) }
+        
+        // User tags with prefixes (use loaded custom tags)
+        val userCustomTags = when {
+            isHentai -> hentaiCustomTags.map { "H-$it" }
+            entry.type == "anime" -> animeCustomTags.map { "A-$it" }
+            else -> emptyList()
+        }
+        allTags.addAll(userCustomTags)
+        
+        // Add user tags from XML
         entry.userTags.forEach { tag ->
             when {
                 isHentai -> allTags.add("H-$tag")
@@ -364,8 +439,18 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
             serialization.name?.let { allTags.add("Published: $it") }
         }
         
-        // User tags with prefixes
+        // Detect hentai content
         val isHentai = allTags.any { it.contains("Hentai", true) }
+        
+        // User tags with prefixes (use loaded custom tags)
+        val userCustomTags = when {
+            isHentai -> hentaiCustomTags.map { "H-$it" }
+            entry.type == "manga" -> mangaCustomTags.map { "M-$it" }
+            else -> emptyList()
+        }
+        allTags.addAll(userCustomTags)
+        
+        // Add user tags from XML
         entry.userTags.forEach { tag ->
             when {
                 isHentai -> allTags.add("H-$tag")
@@ -417,7 +502,13 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
             "military" to "Military",
             "psychological" to "Psychological",
             "thriller" to "Thriller",
-            "adventure" to "Adventure"
+            "adventure" to "Adventure",
+            "ntr" to "NTR",
+            "netorare" to "Netorare",
+            "yuri" to "Yuri",
+            "yaoi" to "Yaoi",
+            "shota" to "Shota",
+            "loli" to "Loli"
         )
         
         val synopsisLower = synopsis.lowercase()
@@ -443,7 +534,7 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
                         entry = entry
                     )
                     
-                    log("✅ Queued download: $fileName")
+                    log("✅ Queued download: $fileName with ${entry.allTags.size} tags")
                 } ?: run {
                     log("⚠️ No image URL for ${entry.title}")
                 }
@@ -515,7 +606,7 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
     private fun loadEntries() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // TODO: Load from database
+                // Entries loaded from XML processing
                 val entries = emptyList<AnimeEntry>()
                 _animeEntries.value = entries
             } catch (e: Exception) {
@@ -548,13 +639,16 @@ class MainViewModel(private val repository: DownloadRepository) : AndroidViewMod
 
     // Logging
     fun log(message: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val currentLogs = _logs.value.toMutableList()
-            currentLogs.add(0, "${System.currentTimeMillis()}: $message")
+            currentLogs.add(0, "${System.currentTimeMillis() % 100000}: $message")
             if (currentLogs.size > 1000) {
                 currentLogs.removeAt(currentLogs.size - 1)
             }
             _logs.value = currentLogs
+            
+            // Also log to repository
+            repository.logInfo("app", message)
         }
     }
 
