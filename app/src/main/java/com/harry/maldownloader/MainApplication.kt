@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.harry.maldownloader.data.DownloadDatabase
 import androidx.room.Room
 
 class MainApplication : Application() {
@@ -13,7 +14,8 @@ class MainApplication : Application() {
         super.onCreate()
         database = Room.databaseBuilder(
             applicationContext,
-            DownloadDatabase::class.java, "download_db"
+            DownloadDatabase::class.java,
+            "download_database"
         ).build()
 
         createNotificationChannel()
