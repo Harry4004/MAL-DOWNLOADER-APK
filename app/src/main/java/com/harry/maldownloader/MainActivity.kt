@@ -12,11 +12,7 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.Xml
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -193,10 +189,33 @@ class MainActivity : AppCompatActivity() {
         all += hentaiCustomTags.map { "Hentai: $it" }
         if (all.isEmpty()) { showToast("No custom tags yet"); return }
         AlertDialog.Builder(this)
-            .setTitle("Custom Tags")
-            .setItems(all.toTypedArray(), null)
+            .setTitle("Custom Tags (Long press to remove)")
+            .setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, all)) { dialog, which ->
+                // No-op on tap
+            }
             .setNegativeButton("OK", null)
-            .show()
+            .show().apply {
+                // Enable long press for removal
+                listView.setOnItemLongClickListener { _, _, position, _ ->
+                    val tag = all[position]
+                    AlertDialog.Builder(context)
+                        .setTitle("Remove Tag?")
+                        .setMessage("Are you sure you want to remove $tag?")
+                        .setPositiveButton("Remove") { _, _ ->
+                            when {
+                                tag.startsWith("Anime: ") -> animeCustomTags.remove(tag.removePrefix("Anime: "))
+                                tag.startsWith("Manga: ") -> mangaCustomTags.remove(tag.removePrefix("Manga: "))
+                                tag.startsWith("Hentai: ") -> hentaiCustomTags.remove(tag.removePrefix("Hentai: "))
+                            }
+                            saveCustomTagsToPrefs()
+                            showToast("Removed: $tag")
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    true
+                }
+            }
     }
 
     private fun parseXml(uri: Uri) {
@@ -343,18 +362,15 @@ class MainActivity : AppCompatActivity() {
             val dcNs = "http://purl.org/dc/elements/1.1/"
             val malNs = "http://myanimelist.net/"
             val xmpNs = "http://ns.adobe.com/xap/1.0/"
-
             val rdf = doc.createElementNS(rdfNs, "rdf:RDF")
             rdf.setAttribute("xmlns:rdf", rdfNs)
             rdf.setAttribute("xmlns:dc", dcNs)
             rdf.setAttribute("xmlns:mal", malNs)
             rdf.setAttribute("xmlns:xmp", xmpNs)
             doc.appendChild(rdf)
-
             val desc = doc.createElementNS(rdfNs, "rdf:Description")
             desc.setAttribute("rdf:about", "")
             rdf.appendChild(desc)
-
             desc.setAttribute("dc:title", entry.title)
             desc.setAttribute("dc:description", entry.synopsis.take(500))
             desc.setAttribute("dc:creator", "MAL Downloader v2.0")
@@ -379,10 +395,7 @@ class MainActivity : AppCompatActivity() {
             }
             dcSubject.appendChild(rdfBag)
             desc.appendChild(dcSubject)
-
-            val transformer = TransformerFactory.newInstance().newTransformer().apply {
-                setOutputProperty("omit-xml-declaration", "yes")
-            }
+            val transformer = TransformerFactory.newInstance().newTransformer().apply { setOutputProperty("omit-xml-declaration", "yes") }
             val out = ByteArrayOutputStream()
             transformer.transform(DOMSource(doc), StreamResult(out))
             out.toByteArray()
