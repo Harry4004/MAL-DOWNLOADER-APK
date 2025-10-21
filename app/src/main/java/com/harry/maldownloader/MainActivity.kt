@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Add Custom Tag")
             .setSingleChoiceItems(types, 0) { _, which -> selected = which }
             .setView(input)
-            .setPositiveButton(getString(R.string.add)) { _, _ ->
+            .setPositiveButton("Add") { _, _ ->
                 val tag = input.text.toString().trim()
                 if (tag.isNotEmpty()) {
                     when (selected) {
@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
                     showToast("Added tag: $tag")
                 }
             }
-            .setNegativeButton(getString(R.string.cancel), null)
+            .setNegativeButton("Cancel", null)
             .show()
     }
 
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Custom Tags")
             .setItems(all.toTypedArray(), null)
-            .setNegativeButton(getString(R.string.ok), null)
+            .setNegativeButton("OK", null)
             .show()
     }
 
@@ -337,16 +337,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun createXmpMetadata(entry: MediaEntry): ByteArray {
         return try {
-            val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
-            val doc = factory.newDocumentBuilder().newDocument()
+            val docBuilder = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder()
+            val doc = docBuilder.newDocument()
             val rdfNs = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
             val dcNs = "http://purl.org/dc/elements/1.1/"
             val malNs = "http://myanimelist.net/"
             val xmpNs = "http://ns.adobe.com/xap/1.0/"
-            val rdf = doc.createElementNS(rdfNs, "rdf:RDF").apply { setAttribute("xmlns:rdf", rdfNs); setAttribute("xmlns:dc", dcNs); setAttribute("xmlns:mal", malNs); setAttribute("xmlns:xmp", xmpNs) }
+
+            val rdf = doc.createElementNS(rdfNs, "rdf:RDF")
+            rdf.setAttribute("xmlns:rdf", rdfNs)
+            rdf.setAttribute("xmlns:dc", dcNs)
+            rdf.setAttribute("xmlns:mal", malNs)
+            rdf.setAttribute("xmlns:xmp", xmpNs)
             doc.appendChild(rdf)
-            val desc = doc.createElementNS(rdfNs, "rdf:Description").apply { setAttribute("rdf:about", "") }
+
+            val desc = doc.createElementNS(rdfNs, "rdf:Description")
+            desc.setAttribute("rdf:about", "")
             rdf.appendChild(desc)
+
             desc.setAttribute("dc:title", entry.title)
             desc.setAttribute("dc:description", entry.synopsis.take(500))
             desc.setAttribute("dc:creator", "MAL Downloader v2.0")
@@ -358,14 +366,30 @@ class MainActivity : AppCompatActivity() {
             desc.setAttribute("mal:episodes", entry.episodes.toString())
             desc.setAttribute("mal:year", entry.year.toString())
             desc.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
-            if (entry.isHentai) { desc.setAttribute("dc:rights", "Adult Content - 18+"); desc.setAttribute("mal:adult", "true") }
+            if (entry.isHentai) {
+                desc.setAttribute("dc:rights", "Adult Content - 18+")
+                desc.setAttribute("mal:adult", "true")
+            }
             val dcSubject = doc.createElementNS(dcNs, "dc:subject")
             val rdfBag = doc.createElementNS(rdfNs, "rdf:Bag")
-            (entry.genres + entry.customTags).distinct().forEach { tag -> val li = doc.createElementNS(rdfNs, "rdf:li"); li.textContent = tag; rdfBag.appendChild(li) }
-            dcSubject.appendChild(rdfBag); desc.appendChild(dcSubject)
-            val transformer = TransformerFactory.newInstance().newTransformer().apply { setOutputProperty("omit-xml-declaration", "yes") }
-            val out = ByteArrayOutputStream(); transformer.transform(DOMSource(doc), StreamResult(out)); out.toByteArray()
-        } catch (e: Exception) { Log.e(TAG, "Failed creating XMP for ${entry.title}", e); ByteArray(0) }
+            (entry.genres + entry.customTags).distinct().forEach { tag ->
+                val li = doc.createElementNS(rdfNs, "rdf:li")
+                li.textContent = tag
+                rdfBag.appendChild(li)
+            }
+            dcSubject.appendChild(rdfBag)
+            desc.appendChild(dcSubject)
+
+            val transformer = TransformerFactory.newInstance().newTransformer().apply {
+                setOutputProperty("omit-xml-declaration", "yes")
+            }
+            val out = ByteArrayOutputStream()
+            transformer.transform(DOMSource(doc), StreamResult(out))
+            out.toByteArray()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
+            ByteArray(0)
+        }
     }
 
     private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
@@ -375,9 +399,18 @@ class MainActivity : AppCompatActivity() {
             out.write(jpegBytes, 0, 2)
             val xmpHeader = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(Charsets.UTF_8)
             val segmentSize = xmpHeader.size + xmpBytes.size + 2
-            if (segmentSize <= 65535) { out.write(0xFF); out.write(0xE1); out.write((segmentSize shr 8) and 0xFF); out.write(segmentSize and 0xFF); out.write(xmpHeader); out.write(xmpBytes) }
+            if (segmentSize <= 65535) {
+                out.write(0xFF); out.write(0xE1); out.write((segmentSize shr 8) and 0xFF); out.write(segmentSize and 0xFF)
+                out.write(xmpHeader); out.write(xmpBytes)
+            }
             var i = 2
-            while (i < jpegBytes.size) { if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) { val marker = jpegBytes[i + 1].toInt() and 0xFF; if (marker == 0xE1) { i += 2; if (i + 1 < jpegBytes.size) { val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF); i += segLen; continue } } } out.write(jpegBytes[i].toInt() and 0xFF); i++ }
+            while (i < jpegBytes.size) {
+                if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) {
+                    val marker = jpegBytes[i + 1].toInt() and 0xFF
+                    if (marker == 0xE1) { i += 2; if (i + 1 < jpegBytes.size) { val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF); i += segLen; continue } }
+                }
+                out.write(jpegBytes[i].toInt() and 0xFF); i++
+            }
             out.toByteArray()
         } catch (e: Exception) { Log.e(TAG, "Error embedding XMP", e); jpegBytes }
     }
