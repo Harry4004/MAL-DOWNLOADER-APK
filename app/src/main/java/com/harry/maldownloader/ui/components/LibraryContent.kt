@@ -101,12 +101,12 @@ fun AnimeEntryCard(
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "${entry.episodesWatched}/${entry.totalEpisodes ?: "?"} episodes",
+                        text = "${entry.episodesWatched ?: 0}/${entry.totalEpisodes ?: "?"} episodes",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Score: ${entry.score}/10",
+                        text = "Score: ${entry.score ?: 0f}/10",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -138,7 +138,10 @@ fun AnimeEntryCard(
                 DetailRowShared(label = "Type", value = entry.type)
                 entry.startDate?.let { DetailRowShared(label = "Start Date", value = it) }
                 entry.endDate?.let { DetailRowShared(label = "End Date", value = it) }
-                entry.tags?.let { DetailRowShared(label = "Tags", value = it) }
+                val tagsText = (entry.tags ?: emptyList()).joinToString(", ")
+                if (tagsText.isNotBlank()) {
+                    DetailRowShared(label = "Tags", value = tagsText)
+                }
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -164,7 +167,7 @@ fun AnimeEntryCard(
                     }
                 }
                 
-                if (!entry.synopsis.isNullOrEmpty() || !entry.genres.isNullOrEmpty()) {
+                if (!entry.synopsis.isNullOrEmpty() || !(entry.genres ?: emptyList()).isEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Card(
                         colors = CardDefaults.cardColors(
@@ -174,7 +177,8 @@ fun AnimeEntryCard(
                         Column(
                             modifier = Modifier.padding(12.dp)
                         ) {
-                            if (!entry.genres.isNullOrEmpty()) {
+                            val genresList = entry.genres ?: emptyList()
+                            if (genresList.isNotEmpty()) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -191,13 +195,13 @@ fun AnimeEntryCard(
                                     )
                                 }
                                 Text(
-                                    text = entry.genres!!,
+                                    text = genresList.joinToString(", "),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(start = 24.dp)
                                 )
                             }
                             if (!entry.synopsis.isNullOrEmpty()) {
-                                if (!entry.genres.isNullOrEmpty()) Spacer(modifier = Modifier.height(8.dp))
+                                if (genresList.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
