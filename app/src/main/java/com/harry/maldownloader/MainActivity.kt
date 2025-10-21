@@ -45,7 +45,8 @@ data class MediaEntry(
     val score: Float = 0f,
     val status: String = "",
     val episodes: Int = 0,
-    val year: Int = 0
+    val year: Int = 0,
+    val allTags: List<String> = emptyList() // ALL tags including themes, demographics, etc.
 )
 
 class MainActivity : AppCompatActivity() {
@@ -109,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         btnLoadXml = findViewById(R.id.btnLoadXml)
         btnAddTag = findViewById(R.id.btnAddTag)
         btnViewTags = findViewById(R.id.btnViewTags)
-        scrollLogs = findViewById(R.id.scrollLogs)  // Using scrollLogs instead of scrollView
+        scrollLogs = findViewById(R.id.scrollLogs)
         btnLoadXml.setOnClickListener { openXmlFilePicker() }
     }
 
@@ -179,7 +180,7 @@ class MainActivity : AppCompatActivity() {
                         0 -> animeCustomTags.add(tag)
                         1 -> mangaCustomTags.add(tag)
                         2 -> hentaiCustomTags.add(tag)
-                        else -> {} // Added else branch
+                        else -> {}
                     }
                     saveCustomTagsToPrefs()
                     showToast("Added tag: $tag")
@@ -208,7 +209,6 @@ class MainActivity : AppCompatActivity() {
         
         tagDialog.show()
         
-        // Enable long press for removal
         tagDialog.listView.setOnItemLongClickListener { _, _, position, _ ->
             val tag = all[position]
             tagDialog.dismiss()
@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
                             when (parser.name?.lowercase()) {
                                 "anime" -> parseMediaEntry(parser, "anime")?.let(entries::add)
                                 "manga" -> parseMediaEntry(parser, "manga")?.let(entries::add)
-                                else -> {} // Added else branch
+                                else -> {}
                             }
                         }
                         eventType = parser.next()
@@ -315,7 +315,7 @@ class MainActivity : AppCompatActivity() {
                         "series_animedb_id", "manga_mangadb_id" -> malId = parser.nextText()?.trim()
                         "series_title", "manga_title" -> title = parser.nextText()?.trim()
                         "my_tags" -> genres.addAll(parser.nextText()?.split(',')?.map { it.trim() } ?: emptyList())
-                        else -> {} // Added else branch
+                        else -> {}
                     }
                 }
             }
@@ -392,39 +392,119 @@ class MainActivity : AppCompatActivity() {
     private fun processApiResponse(jsonString: String, entry: MediaEntry): Pair<MediaEntry, String> {
         val json = JSONObject(jsonString)
         val data = json.getJSONObject("data")
-        val apiGenres = mutableListOf<String>()
+        
+        // Extract ALL possible tags from Jikan API
+        val allTags = mutableListOf<String>()
+        
+        // 1. Basic genres
         data.optJSONArray("genres")?.let { arr -> 
             for (i in 0 until arr.length()) {
-                apiGenres.add(arr.getJSONObject(i).getString("name")) 
+                allTags.add(arr.getJSONObject(i).getString("name"))
             }
         }
+        
+        // 2. Explicit genres (for hentai content)
         data.optJSONArray("explicit_genres")?.let { arr -> 
             for (i in 0 until arr.length()) {
-                apiGenres.add(arr.getJSONObject(i).getString("name")) 
+                allTags.add(arr.getJSONObject(i).getString("name"))
             }
         }
-        val synopsis = data.optString("synopsis", "")
-        val score = data.optDouble("score", 0.0).toFloat()
-        val status = data.optString("status", "")
-        val episodes = data.optInt("episodes", 0)
-        val year = data.optJSONObject("aired")?.optString("from", "")?.take(4)?.toIntOrNull() ?: 0
-        val isHentai = apiGenres.any { it.contains("Hentai", true) || it.contains("Erotica", true) }
         
-        val customTags = if (isHentai) {
-            hentaiCustomTags
-        } else {
-            entry.customTags
+        // 3. Themes
+        data.optJSONArray("themes")?.let { arr -> 
+            for (i in 0 until arr.length()) {
+                allTags.add(arr.getJSONObject(i).getString("name"))
+            }
         }
         
+        // 4. Demographics
+        data.optJSONArray("demographics")?.let { arr -> 
+            for (i in 0 until arr.length()) {
+                allTags.add(arr.getJSONObject(i).getString("name"))
+            }
+        }
+        
+        // 5. Status and type tags
+        val status = data.optString("status", "")
+        if (status.isNotEmpty()) allTags.add(status.replace("_", " "))
+        
+        val type = data.optString("type", "")
+        if (type.isNotEmpty()) allTags.add(type)
+        
+        // 6. Add content type tags
+        allTags.add(entry.type.replaceFirstChar { it.uppercase() }) // "Anime" or "Manga"
+        allTags.add("MyAnimeList")
+        allTags.add("MAL")
+        
+        // 7. Rating-based tags
+        val rating = data.optString("rating", "")
+        if (rating.isNotEmpty()) allTags.add(rating)
+        
+        // 8. Source material tags
+        val source = data.optString("source", "")
+        if (source.isNotEmpty()) allTags.add(source)
+        
+        // 9. Season and year tags
+        val aired = data.optJSONObject("aired")
+        val season = data.optJSONObject("season")
+        if (season != null) {
+            val seasonName = season.optString("season", "")
+            val seasonYear = season.optInt("year", 0)
+            if (seasonName.isNotEmpty()) allTags.add("$seasonName season")
+            if (seasonYear > 0) allTags.add(seasonYear.toString())
+        }
+        
+        // 10. Studios (for anime)
+        if (entry.type == "anime") {
+            data.optJSONArray("studios")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val studio = arr.getJSONObject(i).getString("name")
+                    allTags.add("Studio: $studio")
+                }
+            }
+        }
+        
+        // 11. Publishers/Serializations (for manga)
+        if (entry.type == "manga") {
+            data.optJSONArray("serializations")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val serialization = arr.getJSONObject(i).getString("name")
+                    allTags.add("Published: $serialization")
+                }
+            }
+        }
+        
+        // 12. Custom prefix tags based on type
+        val customTags = if (allTags.any { it.contains("Hentai", true) }) {
+            hentaiCustomTags.map { "H-$it" }
+        } else {
+            when (entry.type) {
+                "anime" -> animeCustomTags.map { "A-$it" }
+                "manga" -> mangaCustomTags.map { "M-$it" }
+                else -> emptyList()
+            }
+        }
+        allTags.addAll(customTags)
+        
+        // Remove duplicates and clean up
+        val finalTags = allTags.distinct().filter { it.isNotBlank() }
+        
+        val synopsis = data.optString("synopsis", "")
+        val score = data.optDouble("score", 0.0).toFloat()
+        val episodes = data.optInt("episodes", 0)
+        val year = aired?.optString("from", "")?.take(4)?.toIntOrNull() ?: 0
+        val isHentai = finalTags.any { it.contains("Hentai", true) || it.contains("Erotica", true) }
+        
         val updated = entry.copy(
-            genres = apiGenres, 
-            customTags = customTags, 
-            isHentai = isHentai, 
-            synopsis = synopsis, 
-            score = score, 
-            status = status, 
-            episodes = episodes, 
-            year = year
+            genres = finalTags.take(10), // Keep first 10 as "genres"
+            customTags = customTags,
+            isHentai = isHentai,
+            synopsis = synopsis,
+            score = score,
+            status = status,
+            episodes = episodes,
+            year = year,
+            allTags = finalTags // Store ALL tags here
         )
         
         val jpg = data.optJSONObject("images")?.optJSONObject("jpg")
@@ -475,12 +555,15 @@ class MainActivity : AppCompatActivity() {
             desc.setAttribute("rdf:about", "")
             rdf.appendChild(desc)
             
+            // Basic metadata
             desc.setAttribute("dc:title", entry.title)
             desc.setAttribute("dc:description", entry.synopsis.take(500))
             desc.setAttribute("dc:creator", "MAL Downloader v2.0")
+            desc.setAttribute("dc:source", "https://myanimelist.net/${entry.type}/${entry.malId}")
+            
+            // MAL specific metadata
             desc.setAttribute("mal:id", entry.malId.toString())
             desc.setAttribute("mal:type", entry.type)
-            desc.setAttribute("mal:genres", entry.genres.joinToString(", "))
             desc.setAttribute("mal:score", entry.score.toString())
             desc.setAttribute("mal:status", entry.status)
             desc.setAttribute("mal:episodes", entry.episodes.toString())
@@ -492,13 +575,20 @@ class MainActivity : AppCompatActivity() {
                 desc.setAttribute("mal:adult", "true")
             }
             
+            // Subject tags - ADD ALL TAGS HERE (25+ tags)
             val dcSubject = doc.createElementNS(dcNs, "dc:subject")
             val rdfBag = doc.createElementNS(rdfNs, "rdf:Bag")
-            (entry.genres + entry.customTags).distinct().forEach { tag ->
+            
+            // Use ALL tags from allTags field
+            entry.allTags.distinct().forEach { tag ->
                 val li = doc.createElementNS(rdfNs, "rdf:li")
                 li.textContent = tag
                 rdfBag.appendChild(li)
             }
+            
+            // Also add Windows XP Keywords format
+            desc.setAttribute("dc:subject", entry.allTags.distinct().joinToString(";"))
+            
             dcSubject.appendChild(rdfBag)
             desc.appendChild(dcSubject)
             
@@ -551,7 +641,7 @@ class MainActivity : AppCompatActivity() {
             jpegBytes 
         }
     }
-    
+
     private suspend fun saveImageToStorage(imageBytes: ByteArray, entry: MediaEntry) {
         try {
             val folder = determineFolderStructure(entry)
@@ -579,13 +669,16 @@ class MainActivity : AppCompatActivity() {
                     addToFileIndex(entry.malId, fileName)
                     logMessage("✅ Saved: $fileName in $folder") 
                 }
+            } else {
+                // Handle older Android versions
+                logMessage("❌ Scoped storage not available on this Android version")
             }
         } catch (e: Exception) { 
             logMessage("❌ Save failed: ${entry.title} - ${e.message ?: "Unknown error"}")
             throw e 
         }
     }
-    
+
     private fun determineFolderStructure(entry: MediaEntry): String {
         val base = "MAL_Export"
         val typeFolder = when {
