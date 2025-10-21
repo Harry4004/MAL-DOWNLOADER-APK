@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun sanitizeForFilename(input: String): String {
         val normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+            .replace("\\p{InCombiningDiacriticalMarks}+.toRegex()", "")
         val sanitized = normalized.replace("[^\\w\\s-]".toRegex(), "")
         return sanitized.trim().replace("\\s+".toRegex(), "_").take(50)
     }
@@ -189,10 +189,8 @@ class MainActivity : AppCompatActivity() {
         all += hentaiCustomTags.map { "Hentai: $it" }
         if (all.isEmpty()) { showToast("No custom tags yet"); return }
         AlertDialog.Builder(this)
-            .setTitle("Custom Tags (Long press to remove)")
-            .setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, all)) { dialog, which ->
-                // No-op on tap
-            }
+            .setTitle("Custom Tags")
+            .setItems(all.toTypedArray(), null)
             .setNegativeButton("OK", null)
             .show().apply {
                 // Enable long press for removal
@@ -397,12 +395,8 @@ class MainActivity : AppCompatActivity() {
             desc.appendChild(dcSubject)
             val transformer = TransformerFactory.newInstance().newTransformer().apply { setOutputProperty("omit-xml-declaration", "yes") }
             val out = ByteArrayOutputStream()
-            transformer.transform(DOMSource(doc), StreamResult(out))
-            out.toByteArray()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed creating XMP for ${entry.title}", e)
-            ByteArray(0)
-        }
+            transformer.transform(DOMSource(doc), StreamResult(out)); out.toByteArray()
+        } catch (e: Exception) { Log.e(TAG, "Failed creating XMP for ${entry.title}", e); ByteArray(0) }
     }
 
     private fun embedXmpInJpeg(jpegBytes: ByteArray, xmpBytes: ByteArray): ByteArray {
@@ -413,17 +407,14 @@ class MainActivity : AppCompatActivity() {
             val xmpHeader = "http://ns.adobe.com/xap/1.0/\u0000".toByteArray(Charsets.UTF_8)
             val segmentSize = xmpHeader.size + xmpBytes.size + 2
             if (segmentSize <= 65535) {
-                out.write(0xFF); out.write(0xE1); out.write((segmentSize shr 8) and 0xFF); out.write(segmentSize and 0xFF)
-                out.write(xmpHeader); out.write(xmpBytes)
-            }
+                out.write(0xFF); out.write(0xE1); out.write((segmentSize shr 8) and 0xFF); out.write(segmentSize and 0xFF); out.write(xmpHeader); out.write(xmpBytes) }
             var i = 2
             while (i < jpegBytes.size) {
                 if (jpegBytes[i] == 0xFF.toByte() && i + 1 < jpegBytes.size) {
                     val marker = jpegBytes[i + 1].toInt() and 0xFF
                     if (marker == 0xE1) { i += 2; if (i + 1 < jpegBytes.size) { val segLen = ((jpegBytes[i].toInt() and 0xFF) shl 8) or (jpegBytes[i + 1].toInt() and 0xFF); i += segLen; continue } }
                 }
-                out.write(jpegBytes[i].toInt() and 0xFF); i++
-            }
+                out.write(jpegBytes[i].toInt() and 0xFF); i++ }
             out.toByteArray()
         } catch (e: Exception) { Log.e(TAG, "Error embedding XMP", e); jpegBytes }
     }
