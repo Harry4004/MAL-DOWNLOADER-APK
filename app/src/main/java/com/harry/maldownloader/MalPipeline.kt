@@ -44,25 +44,27 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
 
                 var event = parser.eventType
                 var insideEntry = false
-                var entryTagName = "anime" // also allow "manga"
+                var entryTagName = "anime"
 
                 // Variables matching the NEW AnimeEntry data class
-                var seriesId = ""
+                var malId = 0
                 var title = ""
                 var type = ""
-                var episodesWatched = 0
+                var episodesWatched: Int? = null
                 var totalEpisodes: Int? = null
-                var userScore = 0
+                var userScore: Float? = null
                 var status: String? = null
                 var startDate: String? = null
                 var endDate: String? = null
-                var tags: String? = null
+                var tagsString: String? = null
                 var imageUrl: String? = null
                 var malUrl: String? = null
                 var synopsis: String? = null
-                var genres: String? = null
+                var genresString: String? = null
                 var studio: String? = null
                 var source: String? = null
+                var chapters: Int? = null
+                var volumes: Int? = null
 
                 onLog("Starting XML parsing...")
                 while (event != XmlPullParser.END_DOCUMENT) {
@@ -78,64 +80,100 @@ class MalPipeline(private val context: Context, private val onLog: (String) -> U
                                     insideEntry = true
                                     entryTagName = n
                                     // Reset all variables
-                                    seriesId = ""; title = ""; type = ""; episodesWatched = 0; totalEpisodes = null
-                                    userScore = 0; status = null; startDate = null; endDate = null; tags = null
-                                    imageUrl = null; malUrl = null; synopsis = null; genres = null; studio = null; source = null
+                                    malId = 0; title = ""; type = ""; episodesWatched = null; totalEpisodes = null
+                                    userScore = null; status = null; startDate = null; endDate = null; tagsString = null
+                                    imageUrl = null; malUrl = null; synopsis = null; genresString = null; studio = null; source = null
+                                    chapters = null; volumes = null
                                 }
-                                // ID variants
-                                "series_animedb_id", "series_animedbid" -> if (insideEntry) seriesId = parser.nextText().trim()
-                                // Title variants
-                                "series_title", "seriestitle" -> if (insideEntry) title = parser.nextText().trim()
-                                // Type
-                                "series_type" -> if (insideEntry) type = parser.nextText().trim()
-                                // Episodes
-                                "series_episodes" -> if (insideEntry) totalEpisodes = parser.nextText().toIntOrNull()
-                                "my_watched_episodes" -> if (insideEntry) episodesWatched = parser.nextText().toIntOrNull() ?: 0
-                                // Dates
-                                "my_start_date" -> if (insideEntry) startDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                "my_finish_date" -> if (insideEntry) endDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                // Score
-                                "my_score" -> if (insideEntry) userScore = parser.nextText().toIntOrNull() ?: 0
-                                // Status
-                                "my_status" -> if (insideEntry) status = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                // Tags
-                                "my_tags", "mytags" -> if (insideEntry) tags = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                // Additional fields that might be in XML
-                                "series_image" -> if (insideEntry) imageUrl = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                "series_synopsis" -> if (insideEntry) synopsis = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                "series_genre" -> if (insideEntry) genres = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                "series_studio" -> if (insideEntry) studio = parser.nextText().trim().takeIf { it.isNotEmpty() }
-                                "series_source" -> if (insideEntry) source = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                "series_animedb_id", "series_animedbid", "manga_mangadb_id" -> if (insideEntry) {
+                                    malId = parser.nextText().trim().toIntOrNull() ?: 0
+                                }
+                                "series_title", "seriestitle", "manga_title" -> if (insideEntry) {
+                                    title = parser.nextText().trim()
+                                }
+                                "series_type" -> if (insideEntry) {
+                                    type = parser.nextText().trim()
+                                }
+                                "series_episodes" -> if (insideEntry) {
+                                    totalEpisodes = parser.nextText().toIntOrNull()
+                                }
+                                "my_watched_episodes" -> if (insideEntry) {
+                                    episodesWatched = parser.nextText().toIntOrNull()
+                                }
+                                "manga_chapters" -> if (insideEntry) {
+                                    chapters = parser.nextText().toIntOrNull()
+                                }
+                                "manga_volumes" -> if (insideEntry) {
+                                    volumes = parser.nextText().toIntOrNull()
+                                }
+                                "my_start_date" -> if (insideEntry) {
+                                    startDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "my_finish_date" -> if (insideEntry) {
+                                    endDate = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "my_score" -> if (insideEntry) {
+                                    userScore = parser.nextText().toIntOrNull()?.toFloat()
+                                }
+                                "my_status" -> if (insideEntry) {
+                                    status = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "my_tags", "mytags" -> if (insideEntry) {
+                                    tagsString = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "series_image" -> if (insideEntry) {
+                                    imageUrl = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "series_synopsis" -> if (insideEntry) {
+                                    synopsis = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "series_genre" -> if (insideEntry) {
+                                    genresString = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "series_studio" -> if (insideEntry) {
+                                    studio = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
+                                "series_source" -> if (insideEntry) {
+                                    source = parser.nextText().trim().takeIf { it.isNotEmpty() }
+                                }
                             }
                         }
                         XmlPullParser.END_TAG -> {
                             val n = parser.name?.lowercase() ?: ""
                             if (insideEntry && (n == entryTagName)) {
-                                if (title.isNotEmpty() && seriesId.isNotEmpty()) {
+                                if (title.isNotEmpty() && malId > 0) {
+                                    // Convert comma-separated strings to lists
+                                    val tagsList = tagsString?.split(",")?.map { it.trim() } ?: emptyList()
+                                    val genresList = genresString?.split(",")?.map { it.trim() } ?: emptyList()
+                                    
                                     entries.add(
                                         AnimeEntry(
-                                            id = seriesId,
+                                            malId = malId,
                                             title = title,
-                                            type = type,
+                                            type = entryTagName,
+                                            userTags = tagsList,
                                             score = userScore,
                                             status = status,
+                                            episodes = totalEpisodes,
                                             episodesWatched = episodesWatched,
                                             totalEpisodes = totalEpisodes,
+                                            chapters = chapters,
+                                            volumes = volumes,
                                             imageUrl = imageUrl,
-                                            imagePath = null,
                                             malUrl = malUrl,
                                             synopsis = synopsis,
-                                            genres = genres,
+                                            genres = genresList,
                                             studio = studio,
                                             source = source,
                                             startDate = startDate,
                                             endDate = endDate,
-                                            tags = tags
+                                            tags = tagsList,
+                                            allTags = tagsList + genresList
                                         )
                                     )
-                                    onLog("Added entry: $title (ID: $seriesId)")
+                                    onLog("Added entry: $title (ID: $malId)")
                                 } else {
-                                    onLog("Skip entry with empty title or ID (title='$title', id='$seriesId')")
+                                    onLog("Skip entry with empty title or ID (title='$title', id='$malId')")
                                 }
                                 insideEntry = false
                             }
