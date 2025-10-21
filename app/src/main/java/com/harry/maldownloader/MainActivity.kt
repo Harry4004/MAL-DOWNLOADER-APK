@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
-    // UI elements
     private lateinit var btnLoadXml: Button
     private lateinit var btnAddTag: Button
     private lateinit var btnViewTags: Button
@@ -28,25 +27,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLogs: TextView
     private lateinit var scrollView: ScrollView
 
-    // Tag storage
     private val animeCustomTags = mutableListOf<String>()
     private val mangaCustomTags = mutableListOf<String>()
     private val hentaiCustomTags = mutableListOf<String>()
 
     private val prefs by lazy { getSharedPreferences("mal_downloader_prefs", MODE_PRIVATE) }
 
-    // OkHttp client
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .build()
-
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Init UI references
         btnLoadXml = findViewById(R.id.btnLoadXml)
         btnAddTag = findViewById(R.id.btnAddTag)
         btnViewTags = findViewById(R.id.btnViewTags)
@@ -60,13 +55,11 @@ class MainActivity : AppCompatActivity() {
         btnLoadXml.setOnClickListener { openFilePicker() }
     }
 
-    // Bind the buttons with click listeners
     private fun bindButtons() {
         btnAddTag.setOnClickListener { showAddTagDialog() }
         btnViewTags.setOnClickListener { showViewTagsDialog() }
     }
 
-    // Open XML picker
     private fun openFilePicker() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -75,7 +68,6 @@ class MainActivity : AppCompatActivity() {
         startActivityForResult(intent, REQUEST_CODE_PICK_XML)
     }
 
-    // Receive selected file
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_PICK_XML && resultCode == RESULT_OK) {
@@ -145,12 +137,10 @@ class MainActivity : AppCompatActivity() {
             val jsonString = response.body?.string() ?: return@withContext null
             val jsonObj = JSONObject(jsonString).optJSONObject("data") ?: return@withContext null
 
-            // Extract image URL
             val images = jsonObj.optJSONObject("images")?.optJSONObject("jpg")
             val imageUrl = images?.optString("large_image_url")?.takeIf { it.isNotEmpty() }
                 ?: images?.optString("image_url") ?: ""
 
-            // Enrich genres and check hentai
             val genresArray = jsonObj.optJSONArray("genres") ?: return@withContext null
             val genres = mutableListOf<String>()
             for (i in 0 until genresArray.length()) {
@@ -160,13 +150,19 @@ class MainActivity : AppCompatActivity() {
             entry.genres = genres
             entry.isHentai = genres.any { it.equals("Hentai", true) }
 
+            // Set primaryFolder based on type and genre
+            entry.primaryFolder = when {
+                entry.isHentai && entry.type == "anime" -> "Hentai/Anime"
+                entry.isHentai && entry.type == "manga" -> "Hentai/Manga"
+                else -> (entry.type.replaceFirstChar { it.uppercase() }) // "Anime" or "Manga"
+            }
+
             return@withContext Pair(entry, imageUrl)
         }
     }
 
     private fun downloadCoverAndEmbedXmp(url: String, entry: MediaEntry) {
-        // Your existing code for image download and XMP embedding
-        // Ensure you handle IO and concurrency properly here
+        // Your own robust implementation here...
     }
 
     private fun parseMalXml(xmlInputStream: InputStream): List<MediaEntry> {
@@ -197,7 +193,7 @@ class MainActivity : AppCompatActivity() {
                                 "series_title", "manga_title" -> it.title = text
                                 "my_tags" -> {
                                     if (text.isNotEmpty()) {
-                                        it.customTags = text.split(",").map { t -> t.trim() }
+                                        it.customTags = text.split(',').map { t -> t.trim() }
                                     }
                                 }
                                 "anime", "manga" -> entries.add(it)
@@ -215,9 +211,6 @@ class MainActivity : AppCompatActivity() {
         return entries
     }
 
-    /**
-     * Shows dialog to add a custom tag for chosen category (Anime/Manga/Hentai)
-     */
     private fun showAddTagDialog() {
         val types = arrayOf("Anime", "Manga", "Hentai")
         var selected = 0
@@ -247,10 +240,12 @@ class MainActivity : AppCompatActivity() {
         allTags += animeCustomTags.map { "Anime: $it" }
         allTags += mangaCustomTags.map { "Manga: $it" }
         allTags += hentaiCustomTags.map { "Hentai: $it" }
+
         if (allTags.isEmpty()) {
             showToast("No custom tags yet")
             return
         }
+
         val items = allTags.toTypedArray()
         val builder = AlertDialog.Builder(this).setTitle("Custom Tags")
         builder.setItems(items, null)
@@ -258,9 +253,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = builder.create()
         dialog.show()
 
-        // Long-press to remove tag support
-        val listView = dialog.listView
-        listView.setOnItemLongClickListener { _, _, position, _ ->
+        dialog.listView.setOnItemLongClickListener { _, _, position, _ ->
             val tag = items[position]
             dialog.dismiss()
             showRemoveTagDialog(tag)
@@ -268,9 +261,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Confirm and remove a tagged item from the custom tags lists
-     */
     private fun showRemoveTagDialog(tag: String) {
         AlertDialog.Builder(this)
             .setTitle("Remove Tag?")
@@ -329,6 +319,7 @@ class MainActivity : AppCompatActivity() {
         var type: String = "", // "anime" or "manga"
         var genres: List<String> = emptyList(),
         var isHentai: Boolean = false,
-        var customTags: List<String> = emptyList()
+        var customTags: List<String> = emptyList(),
+        var primaryFolder: String = "" // Added to fix build error
     )
 }
