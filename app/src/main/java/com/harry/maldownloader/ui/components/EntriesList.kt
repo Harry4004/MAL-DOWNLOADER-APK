@@ -54,7 +54,10 @@ fun EntriesList(
                 EntryCard(
                     entry = entry,
                     onDownloadClick = { onDownloadClick(entry) },
-                    onTagsPreview = { viewModel.log("🏷️ Tags for ${entry.title}: ${entry.allTags.take(10).joinToString(", ")}") }
+                    onTagsPreview = { 
+                        val tagsText = entry.allTags.take(10).joinToString(", ")
+                        viewModel.log("🏷️ Tags for ${entry.title}: $tagsText") 
+                    }
                 )
             }
         }
@@ -82,7 +85,6 @@ fun EntryCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -101,7 +103,6 @@ fun EntryCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Type badge
                         AssistChip(
                             onClick = { },
                             label = {
@@ -119,7 +120,6 @@ fun EntryCard(
                             )
                         )
                         
-                        // Hentai badge
                         if (entry.isHentai) {
                             AssistChip(
                                 onClick = { },
@@ -135,7 +135,6 @@ fun EntryCard(
                             )
                         }
                         
-                        // MAL ID
                         Text(
                             text = "MAL: ${entry.malId}",
                             style = MaterialTheme.typography.labelSmall,
@@ -147,7 +146,6 @@ fun EntryCard(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Synopsis preview
             if (!entry.synopsis.isNullOrEmpty()) {
                 Text(
                     text = entry.synopsis,
@@ -159,13 +157,11 @@ fun EntryCard(
                 Spacer(modifier = Modifier.height(8.dp))
             }
             
-            // Score and stats
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Score
                 if (entry.score != null && entry.score > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -180,7 +176,6 @@ fun EntryCard(
                     }
                 }
                 
-                // Episodes/Chapters
                 when (entry.type) {
                     "anime" -> entry.episodes?.let { eps ->
                         if (eps > 0) {
@@ -203,7 +198,6 @@ fun EntryCard(
                     }
                 }
                 
-                // Tag count
                 Text(
                     text = "🏷️ ${entry.allTags.size} tags",
                     style = MaterialTheme.typography.bodySmall,
@@ -214,7 +208,6 @@ fun EntryCard(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
