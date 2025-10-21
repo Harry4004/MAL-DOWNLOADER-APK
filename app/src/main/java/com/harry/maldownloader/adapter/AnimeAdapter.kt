@@ -36,21 +36,19 @@ class AnimeAdapter(
         val entry = entries[position]
         holder.titleText.text = entry.title
         holder.statusText.text = entry.status ?: "Unknown"
-        holder.episodesText.text = "${entry.episodesWatched}/${entry.totalEpisodes ?: "?"} eps"
+        holder.episodesText.text = "${entry.episodesWatched ?: 0}/${entry.totalEpisodes ?: "?"} eps"
         
-        // Load image with Coil (fixed property name)
         holder.imageView.load(entry.imagePath ?: entry.imageUrl)
         
-        // Populate tags as chips
         holder.tagGroup.removeAllViews()
-        entry.tags?.split(",")?.forEach { tag ->
+        val tagList: List<String> = entry.tags ?: emptyList()
+        tagList.forEach { tag ->
             val trimmedTag = tag.trim()
             if (trimmedTag.isNotEmpty()) {
                 val chip = Chip(holder.tagGroup.context).apply {
                     text = trimmedTag
                     isCloseIconVisible = true
                     setOnCloseIconClickListener { 
-                        // Remove tag logic
                         val updatedTags = getUpdatedTags(position, trimmedTag)
                         onTagEdit(position, updatedTags)
                     }
@@ -60,16 +58,17 @@ class AnimeAdapter(
         }
         
         holder.itemView.setOnLongClickListener {
-            showTagEditDialog(holder.itemView.context, position, entry.tags ?: "")
+            showTagEditDialog(holder.itemView.context, position, tagList)
             true
         }
     }
 
     override fun getItemCount() = entries.size
 
-    private fun showTagEditDialog(context: android.content.Context, position: Int, currentTags: String) {
+    private fun showTagEditDialog(context: android.content.Context, position: Int, currentTags: List<String>) {
+        val initial = currentTags.joinToString(", ")
         val input = EditText(context).apply { 
-            setText(currentTags)
+            setText(initial)
             hint = "Enter tags separated by commas"
         }
         
@@ -77,18 +76,18 @@ class AnimeAdapter(
             .setTitle("Edit Tags (comma-separated)")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
-                val newTags = input.text.toString()
+                val newTagsString = input.text.toString()
+                val newTags = newTagsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 entries[position] = entries[position].copy(tags = newTags)
                 notifyItemChanged(position)
-                val tagList = newTags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                onTagEdit(position, tagList)
+                onTagEdit(position, newTags)
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
     private fun getUpdatedTags(position: Int, removedTag: String): List<String> {
-        val tags = entries[position].tags?.split(",") ?: emptyList()
+        val tags = entries[position].tags ?: emptyList()
         return tags.map { it.trim() }.filter { it != removedTag.trim() && it.isNotEmpty() }
     }
 }
