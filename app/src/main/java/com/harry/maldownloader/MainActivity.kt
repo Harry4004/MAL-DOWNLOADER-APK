@@ -46,7 +46,12 @@ data class MediaEntry(
     val status: String = "",
     val episodes: Int = 0,
     val year: Int = 0,
-    val allTags: List<String> = emptyList() // ALL tags including themes, demographics, etc.
+    val allTags: List<String> = emptyList(),
+    val studios: List<String> = emptyList(),
+    val demographics: List<String> = emptyList(),
+    val themes: List<String> = emptyList(),
+    val rating: String = "",
+    val source: String = ""
 )
 
 class MainActivity : AppCompatActivity() {
@@ -393,8 +398,11 @@ class MainActivity : AppCompatActivity() {
         val json = JSONObject(jsonString)
         val data = json.getJSONObject("data")
         
-        // Extract ALL possible tags from Jikan API
-        val allTags = mutableListOf<String>()
+        // Extract ALL possible tags from Jikan API - COMPREHENSIVE TAG EXTRACTION
+        val allTags = mutableSetOf<String>()
+        val studios = mutableListOf<String>()
+        val demographics = mutableListOf<String>()
+        val themes = mutableListOf<String>()
         
         // 1. Basic genres
         data.optJSONArray("genres")?.let { arr -> 
@@ -403,68 +411,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // 2. Explicit genres (for hentai content)
+        // 2. Explicit genres (critical for hentai content)
         data.optJSONArray("explicit_genres")?.let { arr -> 
             for (i in 0 until arr.length()) {
                 allTags.add(arr.getJSONObject(i).getString("name"))
             }
         }
         
-        // 3. Themes
+        // 3. Themes (story themes like School, Supernatural, etc.)
         data.optJSONArray("themes")?.let { arr -> 
             for (i in 0 until arr.length()) {
-                allTags.add(arr.getJSONObject(i).getString("name"))
+                val theme = arr.getJSONObject(i).getString("name")
+                themes.add(theme)
+                allTags.add(theme)
             }
         }
         
-        // 4. Demographics
+        // 4. Demographics (target audience)
         data.optJSONArray("demographics")?.let { arr -> 
             for (i in 0 until arr.length()) {
-                allTags.add(arr.getJSONObject(i).getString("name"))
+                val demo = arr.getJSONObject(i).getString("name")
+                demographics.add(demo)
+                allTags.add(demo)
             }
         }
         
-        // 5. Status and type tags
-        val status = data.optString("status", "")
-        if (status.isNotEmpty()) allTags.add(status.replace("_", " "))
-        
-        val type = data.optString("type", "")
-        if (type.isNotEmpty()) allTags.add(type)
-        
-        // 6. Add content type tags
-        allTags.add(entry.type.replaceFirstChar { it.uppercase() }) // "Anime" or "Manga"
-        allTags.add("MyAnimeList")
-        allTags.add("MAL")
-        
-        // 7. Rating-based tags
-        val rating = data.optString("rating", "")
-        if (rating.isNotEmpty()) allTags.add(rating)
-        
-        // 8. Source material tags
-        val source = data.optString("source", "")
-        if (source.isNotEmpty()) allTags.add(source)
-        
-        // 9. Season and year tags
-        val aired = data.optJSONObject("aired")
-        val season = data.optJSONObject("season")
-        if (season != null) {
-            val seasonName = season.optString("season", "")
-            val seasonYear = season.optInt("year", 0)
-            if (seasonName.isNotEmpty()) allTags.add("$seasonName season")
-            if (seasonYear > 0) allTags.add(seasonYear.toString())
-        }
-        
-        // 10. Studios (for anime)
+        // 5. Studios (for anime)
         if (entry.type == "anime") {
             data.optJSONArray("studios")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val studio = arr.getJSONObject(i).getString("name")
+                    studios.add(studio)
                     allTags.add("Studio: $studio")
                 }
             }
         }
         
-        // 11. Publishers/Serializations (for manga)
+        // 6. Serializations/Publishers (for manga)
         if (entry.type == "manga") {
             data.optJSONArray("serializations")?.let { arr ->
                 for (i in 0 until arr.length()) {
@@ -474,8 +457,66 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // 12. Custom prefix tags based on type
-        val customTags = if (allTags.any { it.contains("Hentai", true) }) {
+        // 7. Status and type information
+        val status = data.optString("status", "")
+        if (status.isNotEmpty()) {
+            allTags.add(status.replace("_", " "))
+        }
+        
+        val type = data.optString("type", "")
+        if (type.isNotEmpty()) allTags.add(type)
+        
+        // 8. Rating information
+        val rating = data.optString("rating", "")
+        if (rating.isNotEmpty()) allTags.add(rating)
+        
+        // 9. Source material
+        val source = data.optString("source", "")
+        if (source.isNotEmpty()) allTags.add("Source: $source")
+        
+        // 10. Season and year
+        val aired = data.optJSONObject("aired")
+        aired?.optJSONObject("prop")?.let { prop ->
+            prop.optJSONObject("from")?.let { from ->
+                val year = from.optInt("year", 0)
+                val month = from.optInt("month", 0)
+                if (year > 0) {
+                    allTags.add(year.toString())
+                    val season = when (month) {
+                        in 1..3 -> "Winter"
+                        in 4..6 -> "Spring"
+                        in 7..9 -> "Summer"
+                        in 10..12 -> "Fall"
+                        else -> null
+                    }
+                    if (season != null) {
+                        allTags.add("$season $year")
+                        allTags.add("$season Season")
+                    }
+                }
+            }
+        }
+        
+        // 11. Add content type and platform tags
+        allTags.add(entry.type.replaceFirstChar { it.uppercase() }) // "Anime" or "Manga"
+        allTags.add("MyAnimeList")
+        allTags.add("MAL")
+        
+        // 12. Score-based tags
+        val score = data.optDouble("score", 0.0).toFloat()
+        if (score > 0) {
+            when {
+                score >= 9.0 -> allTags.add("Masterpiece")
+                score >= 8.0 -> allTags.add("Great")
+                score >= 7.0 -> allTags.add("Good")
+                score >= 6.0 -> allTags.add("Fine")
+                else -> allTags.add("Poor")
+            }
+        }
+        
+        // 13. Custom prefix tags based on type
+        val isHentai = allTags.any { it.contains("Hentai", true) || it.contains("Erotica", true) }
+        val customTags = if (isHentai) {
             hentaiCustomTags.map { "H-$it" }
         } else {
             when (entry.type) {
@@ -486,17 +527,21 @@ class MainActivity : AppCompatActivity() {
         }
         allTags.addAll(customTags)
         
-        // Remove duplicates and clean up
-        val finalTags = allTags.distinct().filter { it.isNotBlank() }
+        // 14. Add searchable ID tags
+        allTags.add("MAL-${entry.malId}")
+        allTags.add("ID-${entry.malId}")
+        
+        // Clean and finalize tags
+        val finalTags = allTags.toList().distinct().filter { it.isNotBlank() && it.length > 1 }
+        
+        logMessage("📊 Extracted ${finalTags.size} tags for ${entry.title}")
         
         val synopsis = data.optString("synopsis", "")
-        val score = data.optDouble("score", 0.0).toFloat()
         val episodes = data.optInt("episodes", 0)
         val year = aired?.optString("from", "")?.take(4)?.toIntOrNull() ?: 0
-        val isHentai = finalTags.any { it.contains("Hentai", true) || it.contains("Erotica", true) }
         
         val updated = entry.copy(
-            genres = finalTags.take(10), // Keep first 10 as "genres"
+            genres = finalTags.filter { !it.startsWith("A-") && !it.startsWith("M-") && !it.startsWith("H-") }.take(10),
             customTags = customTags,
             isHentai = isHentai,
             synopsis = synopsis,
@@ -504,7 +549,12 @@ class MainActivity : AppCompatActivity() {
             status = status,
             episodes = episodes,
             year = year,
-            allTags = finalTags // Store ALL tags here
+            allTags = finalTags,
+            studios = studios,
+            demographics = demographics,
+            themes = themes,
+            rating = rating,
+            source = source
         )
         
         val jpg = data.optJSONObject("images")?.optJSONObject("jpg")
@@ -555,11 +605,12 @@ class MainActivity : AppCompatActivity() {
             desc.setAttribute("rdf:about", "")
             rdf.appendChild(desc)
             
-            // Basic metadata
+            // Enhanced metadata with ALL available fields
             desc.setAttribute("dc:title", entry.title)
-            desc.setAttribute("dc:description", entry.synopsis.take(500))
+            desc.setAttribute("dc:description", entry.synopsis.take(2000))
             desc.setAttribute("dc:creator", "MAL Downloader v2.0")
             desc.setAttribute("dc:source", "https://myanimelist.net/${entry.type}/${entry.malId}")
+            desc.setAttribute("dc:rights", if (entry.isHentai) "Adult Content - 18+" else "© MyAnimeList")
             
             // MAL specific metadata
             desc.setAttribute("mal:id", entry.malId.toString())
@@ -568,29 +619,36 @@ class MainActivity : AppCompatActivity() {
             desc.setAttribute("mal:status", entry.status)
             desc.setAttribute("mal:episodes", entry.episodes.toString())
             desc.setAttribute("mal:year", entry.year.toString())
+            desc.setAttribute("mal:rating", entry.rating)
+            desc.setAttribute("mal:source", entry.source)
             desc.setAttribute("xmp:Rating", (entry.score / 2).toInt().toString())
             
             if (entry.isHentai) {
-                desc.setAttribute("dc:rights", "Adult Content - 18+")
                 desc.setAttribute("mal:adult", "true")
             }
             
-            // Subject tags - ADD ALL TAGS HERE (25+ tags)
+            // Studios/Publishers
+            if (entry.studios.isNotEmpty()) {
+                desc.setAttribute("mal:studios", entry.studios.joinToString(", "))
+            }
+            
+            // COMPREHENSIVE SUBJECT TAGS - ALL 25+ TAGS EMBEDDED HERE
             val dcSubject = doc.createElementNS(dcNs, "dc:subject")
             val rdfBag = doc.createElementNS(rdfNs, "rdf:Bag")
             
-            // Use ALL tags from allTags field
-            entry.allTags.distinct().forEach { tag ->
+            // Use ALL extracted tags (this is where the 25+ unique tags get embedded)
+            entry.allTags.forEach { tag ->
                 val li = doc.createElementNS(rdfNs, "rdf:li")
                 li.textContent = tag
                 rdfBag.appendChild(li)
             }
             
-            // Also add Windows XP Keywords format
-            desc.setAttribute("dc:subject", entry.allTags.distinct().joinToString(";"))
-            
             dcSubject.appendChild(rdfBag)
             desc.appendChild(dcSubject)
+            
+            // Windows XP Keywords (semicolon-separated for AVES compatibility)
+            desc.setAttribute("Iptc4xmpCore:Keywords", entry.allTags.joinToString(","))
+            desc.setAttribute("xmp:Label", if (entry.isHentai) "Adult" else "General")
             
             val transformer = TransformerFactory.newInstance().newTransformer().apply { 
                 setOutputProperty("omit-xml-declaration", "yes") 
@@ -667,10 +725,9 @@ class MainActivity : AppCompatActivity() {
                         put(MediaStore.Images.Media.IS_PENDING, 0) 
                     }, null, null)
                     addToFileIndex(entry.malId, fileName)
-                    logMessage("✅ Saved: $fileName in $folder") 
+                    logMessage("✅ Saved: $fileName in $folder (${entry.allTags.size} tags embedded)") 
                 }
             } else {
-                // Handle older Android versions
                 logMessage("❌ Scoped storage not available on this Android version")
             }
         } catch (e: Exception) { 
