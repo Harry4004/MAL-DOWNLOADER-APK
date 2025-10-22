@@ -57,6 +57,20 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     fun setNotificationPermission(granted: Boolean) { _notificationPermissionGranted.value = granted }
     fun setStoragePermission(granted: Boolean) { _storagePermissionGranted.value = granted }
 
+    fun addCustomTag(tag: String) {
+        val updated = _customTags.value.toMutableList().apply {
+            if (!contains(tag)) add(tag)
+        }
+        _customTags.value = updated
+    }
+
+    fun removeCustomTag(tag: String) {
+        val updated = _customTags.value.toMutableList().apply {
+            remove(tag)
+        }
+        _customTags.value = updated
+    }
+
     suspend fun processMalFile(context: Context, uri: Uri) {
         _isProcessing.value = true
         try {
