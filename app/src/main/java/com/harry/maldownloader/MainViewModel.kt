@@ -71,6 +71,10 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         _customTags.value = updated
     }
 
+    fun clearLogs() {
+        _logs.value = emptyList()
+    }
+
     suspend fun processMalFile(context: Context, uri: Uri) {
         _isProcessing.value = true
         try {
@@ -109,8 +113,14 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }.onSuccess { resp ->
             if (resp != null && resp.isSuccessful) {
                 return@withContext when (entry.type) {
-                    "anime" -> resp.body()?.let { mapFromMalAnime(entry, it) }
-                    "manga" -> resp.body()?.let { mapFromMalManga(entry, it) }
+                    "anime" -> {
+                        val animeResp = resp as retrofit2.Response<MalAnimeResponse>
+                        animeResp.body()?.let { mapFromMalAnime(entry, it) }
+                    }
+                    "manga" -> {
+                        val mangaResp = resp as retrofit2.Response<MalMangaResponse>
+                        mangaResp.body()?.let { mapFromMalManga(entry, it) }
+                    }
                     else -> null
                 }
             }
@@ -125,8 +135,14 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }.onSuccess { resp ->
             if (resp != null && resp.isSuccessful) {
                 return@withContext when (entry.type) {
-                    "anime" -> resp.body()?.data?.let { enrichAnimeEntry(entry, it) }
-                    "manga" -> resp.body()?.data?.let { enrichMangaEntry(entry, it) }
+                    "anime" -> {
+                        val animeResp = resp as retrofit2.Response<AnimeResponse>
+                        animeResp.body()?.data?.let { enrichAnimeEntry(entry, it) }
+                    }
+                    "manga" -> {
+                        val mangaResp = resp as retrofit2.Response<MangaResponse>
+                        mangaResp.body()?.data?.let { enrichMangaEntry(entry, it) }
+                    }
                     else -> null
                 }
             }
@@ -154,6 +170,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             isHentai = isHentai
         )
     }
+    
     private fun mapFromMalManga(entry: AnimeEntry, mal: MalMangaResponse): AnimeEntry {
         val tags = mutableSetOf<String>()
         tags.add("Manga"); tags.add("MAL-${mal.id}")
@@ -166,9 +183,90 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             synopsis = mal.synopsis,
             score = mal.mean?.toFloat(),
             status = mal.status,
+            chapters = mal.chapters,
+            volumes = mal.volumes,
             imageUrl = mal.main_picture?.large ?: mal.main_picture?.medium,
             allTags = tags.toList(),
             genres = mal.genres?.mapNotNull { it.name } ?: emptyList(),
+            tags = tags.toList(),
+            isHentai = isHentai
+        )
+    }
+
+    private fun enrichAnimeEntry(entry: AnimeEntry, data: AnimeData): AnimeEntry {
+        val tags = mutableSetOf<String>()
+        tags.add("Anime")
+        tags.add("MAL-${data.mal_id}")
+        data.type?.let { tags.add(it) }
+        data.status?.let { tags.add(it) }
+        data.rating?.let { tags.add(it) }
+        data.source?.let { tags.add(it) }
+        data.season?.let { tags.add(it) }
+        data.year?.let { tags.add(it.toString()) }
+        
+        // Add genres
+        data.genres?.forEach { genre -> genre.name?.let { tags.add(it) } }
+        data.explicit_genres?.forEach { genre -> genre.name?.let { tags.add(it) } }
+        data.themes?.forEach { theme -> theme.name?.let { tags.add(it) } }
+        data.demographics?.forEach { demo -> demo.name?.let { tags.add(it) } }
+        
+        // Add studios and producers
+        data.studios?.forEach { studio -> studio.name?.let { tags.add("Studio: $it") } }
+        data.producers?.forEach { producer -> producer.name?.let { tags.add("Producer: $it") } }
+        
+        val isHentai = data.explicit_genres?.any { it.name?.contains("hentai", true) == true } ?: false ||
+                      data.rating?.contains("hentai", true) ?: false
+        
+        return entry.copy(
+            title = data.title ?: entry.title,
+            englishTitle = data.title_english,
+            japaneseTitle = data.title_japanese,
+            synopsis = data.synopsis,
+            score = data.score?.toFloat(),
+            status = data.status,
+            episodes = data.episodes,
+            source = data.source,
+            imageUrl = data.images?.jpg?.large_image_url ?: data.images?.jpg?.image_url,
+            allTags = tags.toList(),
+            genres = data.genres?.mapNotNull { it.name } ?: emptyList(),
+            tags = tags.toList(),
+            studio = data.studios?.firstOrNull()?.name,
+            isHentai = isHentai
+        )
+    }
+    
+    private fun enrichMangaEntry(entry: AnimeEntry, data: MangaData): AnimeEntry {
+        val tags = mutableSetOf<String>()
+        tags.add("Manga")
+        tags.add("MAL-${data.mal_id}")
+        data.type?.let { tags.add(it) }
+        data.status?.let { tags.add(it) }
+        data.chapters?.let { tags.add("Chapters: $it") }
+        data.volumes?.let { tags.add("Volumes: $it") }
+        
+        // Add genres
+        data.genres?.forEach { genre -> genre.name?.let { tags.add(it) } }
+        data.explicit_genres?.forEach { genre -> genre.name?.let { tags.add(it) } }
+        data.themes?.forEach { theme -> theme.name?.let { tags.add(it) } }
+        data.demographics?.forEach { demo -> demo.name?.let { tags.add(it) } }
+        
+        // Add authors
+        data.authors?.forEach { author -> author.name?.let { tags.add("Author: $it") } }
+        
+        val isHentai = data.explicit_genres?.any { it.name?.contains("hentai", true) == true } ?: false
+        
+        return entry.copy(
+            title = data.title ?: entry.title,
+            englishTitle = data.title_english,
+            japaneseTitle = data.title_japanese,
+            synopsis = data.synopsis,
+            score = data.score?.toFloat(),
+            status = data.status,
+            chapters = data.chapters,
+            volumes = data.volumes,
+            imageUrl = data.images?.jpg?.large_image_url ?: data.images?.jpg?.image_url,
+            allTags = tags.toList(),
+            genres = data.genres?.mapNotNull { it.name } ?: emptyList(),
             tags = tags.toList(),
             isHentai = isHentai
         )
@@ -193,7 +291,14 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                             "series_animedb_id", "manga_mangadb_id" -> { malId = text.toIntOrNull() ?: 0 }
                             "series_title", "manga_title" -> { title = text }
                             "my_tags" -> { if (text.isNotEmpty()) userTagsList = text.split(",").map { it.trim() } }
-                            "anime", "manga" -> if (malId > 0 && title.isNotEmpty()) entries.add(AnimeEntry(malId, title, currentType, userTagsList))
+                            "anime", "manga" -> if (malId > 0 && title.isNotEmpty()) {
+                                entries.add(AnimeEntry(
+                                    malId = malId,
+                                    title = title,
+                                    type = currentType,
+                                    userTags = userTagsList
+                                ))
+                            }
                         }
                     }
                     eventType = parser.next()
@@ -212,15 +317,9 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }
     }
 
-    suspend fun downloadImages(entry: AnimeEntry) { /* unchanged body in your repo */ }
-}
-
-class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    suspend fun downloadImages(entry: AnimeEntry) {
+        // Placeholder implementation - needs to be implemented based on your repository
+        log("📥 Starting download for: ${entry.title}")
+        // Add your download logic here
     }
 }
