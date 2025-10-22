@@ -13,7 +13,9 @@ import kotlinx.coroutines.launch
 
 class MainApplication : Application() {
     val database by lazy {
-        try { DownloadDatabase.getDatabase(this) } catch (e: Exception) {
+        try {
+            DownloadDatabase.getDatabase(this)
+        } catch (e: Exception) {
             Log.e("MainApplication", "Database initialization failed", e)
             null
         }
@@ -52,9 +54,9 @@ class MainApplication : Application() {
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channels = listOf(
-                NotificationChannel("download_channel","Download Progress", NotificationManager.IMPORTANCE_LOW),
-                NotificationChannel("download_complete","Download Complete", NotificationManager.IMPORTANCE_DEFAULT),
-                NotificationChannel("download_error","Download Errors", NotificationManager.IMPORTANCE_HIGH)
+                NotificationChannel("download_channel", "Download Progress", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel("download_complete", "Download Complete", NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel("download_error", "Download Errors", NotificationManager.IMPORTANCE_HIGH)
             )
             val manager = getSystemService(NotificationManager::class.java)
             channels.forEach { manager.createNotificationChannel(it) }
