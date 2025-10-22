@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import android.os.Build
 import com.harry.maldownloader.data.DownloadDatabase
 import com.harry.maldownloader.data.DownloadLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainApplication : Application() {
     val database by lazy {
@@ -17,16 +20,18 @@ class MainApplication : Application() {
 
         // Global crash logger to capture uncaught exceptions into Logs tab
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
-            try {
-                database.logDao().insertLog(
-                    DownloadLog(
-                        downloadId = "app",
-                        level = "FATAL",
-                        message = "Uncaught crash in ${t.name}: ${e.javaClass.simpleName} - ${e.message}",
-                        exception = e.stackTraceToString()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    database.logDao().insertLog(
+                        DownloadLog(
+                            downloadId = "app",
+                            level = "FATAL",
+                            message = "Uncaught crash in ${t.name}: ${e.javaClass.simpleName} - ${e.message}",
+                            exception = e.stackTraceToString()
+                        )
                     )
-                )
-            } catch (_: Exception) { }
+                } catch (_: Exception) { }
+            }
             android.util.Log.e("AppCrash", "Fatal crash", e)
         }
 
