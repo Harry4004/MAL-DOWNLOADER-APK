@@ -5,8 +5,13 @@
             val entries = withContext(Dispatchers.IO) { parseMalXml(context, uri) }
             log("📝 Parsed entries: ${entries.size}, URI: $uri")
             if (entries.isEmpty()) {
-                log("❌ No entries found. The file content may be unreadable or not a valid MAL XML export.")
-                // Optionally: Show a user-visible Snackbar/toast here
+                log("❌ No entries found. The file content may be unreadable, not a valid MAL XML export, or permission was denied.")
+                // Add handling for file permission issues
+                try {
+                    context.contentResolver.openInputStream(uri)
+                } catch (e: Exception) {
+                    log("❌ Could not open XML file: ${e.javaClass.simpleName} - ${e.localizedMessage}")
+                }
                 return
             }
             _animeEntries.value = entries
