@@ -5,33 +5,48 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.harry.maldownloader.data.DownloadDatabase
-import androidx.room.Room
 
 class MainApplication : Application() {
-    lateinit var database: DownloadDatabase
+    val database by lazy {
+        DownloadDatabase.getDatabase(this)
+    }
 
     override fun onCreate() {
         super.onCreate()
-        database = Room.databaseBuilder(
-            applicationContext,
-            DownloadDatabase::class.java,
-            "download_database"
-        ).build()
-
-        createNotificationChannel()
+        createNotificationChannels()
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "download_channel",
-                "Download Progress",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows download progress notifications"
-            }
+            val channels = listOf(
+                NotificationChannel(
+                    "download_channel",
+                    "Download Progress",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Shows download progress notifications"
+                    setShowBadge(false)
+                },
+                NotificationChannel(
+                    "download_complete",
+                    "Download Complete",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifies when downloads are completed"
+                },
+                NotificationChannel(
+                    "download_error",
+                    "Download Errors",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Notifies about download failures"
+                }
+            )
+            
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            channels.forEach { channel ->
+                manager.createNotificationChannel(channel)
+            }
         }
     }
 }
