@@ -38,15 +38,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
     private lateinit var repository: DownloadRepository
 
+    // Hold critical startup error to display in UI
+    private val criticalError = mutableStateOf<Throwable?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         Log.d("MainActivity", "Starting onCreate")
-        
+
         try {
             Log.d("MainActivity", "Initializing database")
             val database = DownloadDatabase.getDatabase(this)
-            
+
             Log.d("MainActivity", "Initializing repository")
             repository = DownloadRepository(
                 context = this,
@@ -62,17 +65,21 @@ class MainActivity : ComponentActivity() {
             Log.d("MainActivity", "Setting content")
             setContent {
                 MaldownloaderTheme {
-                    SafeMainScreen(viewModel = viewModel)
+                    if (criticalError.value != null) {
+                        ErrorScreen(error = criticalError.value!!)
+                    } else {
+                        SafeMainScreen(viewModel = viewModel)
+                    }
                 }
             }
 
             Log.d("MainActivity", "Checking permissions")
             checkPermissions()
-            
+
             Log.d("MainActivity", "onCreate completed successfully")
         } catch (e: Exception) {
             Log.e("MainActivity", "Critical error in onCreate", e)
-            finish()
+            criticalError.value = e // show error on screen, do not finish()
         }
     }
 
@@ -151,6 +158,36 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+fun ErrorScreen(error: Throwable) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "🚨 Critical Startup Error:",
+                color = Color.Red,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = error.localizedMessage ?: "Unknown error",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = error.stackTraceToString(),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafeMainScreen(viewModel: MainViewModel) {
@@ -172,7 +209,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            scope.launch { 
+            scope.launch {
                 viewModel.processMalFile(activity, it)
             }
         }
@@ -394,7 +431,7 @@ fun SafeEntriesTab(
     entries: List<com.harry.maldownloader.data.AnimeEntry>
 ) {
     val scope = rememberCoroutineScope()
-    
+
     Column {
         if (entries.isNotEmpty()) {
             Card(
@@ -458,7 +495,7 @@ fun SafeEntriesTab(
             viewModel = viewModel,
             entries = entries,
             onDownloadClick = { entry ->
-                scope.launch { 
+                scope.launch {
                     viewModel.downloadImages(entry)
                 }
             }
@@ -553,52 +590,25 @@ fun SafeLogsTab(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-        }
 
-        Card(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            if (logs.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                logs.forEach { logEntry ->
                     Text(
-                        text = "Ready to process MAL XML!\n\nLogs will appear here during processing.\n\nAny crashes will be captured here too.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp)
+                        text = logEntry,
+                        style = MaterialTheme.typography.bodySmall
                     )
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    logs.forEach { log ->
-                        Text(
-                            text = log,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(vertical = 1.dp),
-                            color = if (log.contains("FATAL")) Color.Red 
-                                   else if (log.contains("ERROR")) Color(0xFFFF6B35)
-                                   else if (log.contains("WARN")) Color(0xFFFF9800)
-                                   else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No logs available", style = MaterialTheme.typography.bodyMedium)
+            }
         }
-    }
-}
-
-class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
