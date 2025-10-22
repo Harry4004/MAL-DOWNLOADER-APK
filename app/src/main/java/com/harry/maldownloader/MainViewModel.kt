@@ -3,12 +3,9 @@ package com.harry.maldownloader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import android.app.Application
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Xml
-import androidx.core.content.ContextCompat
 import com.harry.maldownloader.api.*
 import com.harry.maldownloader.data.AnimeEntry
 import com.harry.maldownloader.data.DownloadItem
