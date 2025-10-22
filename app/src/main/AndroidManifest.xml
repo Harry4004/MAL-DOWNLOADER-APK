@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".MainApplication"
+        android:name="com.harry.maldownloader.MainApplication"
         android:allowBackup="true"
         android:label="MAL Downloader v3.0"
         android:supportsRtl="true"
