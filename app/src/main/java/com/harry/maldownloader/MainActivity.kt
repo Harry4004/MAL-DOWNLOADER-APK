@@ -61,27 +61,8 @@ class MainActivity : ComponentActivity() {
 
             Log.d("MainActivity", "Setting content")
             setContent {
-                try {
-                    MaldownloaderTheme {
-                        SafeMainScreen(viewModel = viewModel)
-                    }
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error in Compose content", e)
-                    // Fallback UI
-                    Surface {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("MAL Downloader")
-                                Text("Initialization Error: ${e.message}")
-                                Button(onClick = { recreate() }) {
-                                    Text("Retry")
-                                }
-                            }
-                        }
-                    }
+                MaldownloaderTheme {
+                    SafeMainScreen(viewModel = viewModel)
                 }
             }
 
@@ -91,30 +72,7 @@ class MainActivity : ComponentActivity() {
             Log.d("MainActivity", "onCreate completed successfully")
         } catch (e: Exception) {
             Log.e("MainActivity", "Critical error in onCreate", e)
-            // Show error dialog and finish
-            try {
-                setContent {
-                    MaterialTheme {
-                        Surface {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Critical Initialization Error")
-                                    Text("${e.javaClass.simpleName}: ${e.message}")
-                                    Button(onClick = { finish() }) {
-                                        Text("Exit")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (fatalError: Exception) {
-                Log.e("MainActivity", "Fatal error setting error content", fatalError)
-                finish()
-            }
+            finish()
         }
     }
 
@@ -196,187 +154,136 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafeMainScreen(viewModel: MainViewModel) {
-    try {
-        val context = LocalContext.current
-        val activity = context as ComponentActivity
-        val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val activity = context as ComponentActivity
+    val scope = rememberCoroutineScope()
 
-        val isProcessing by viewModel.isProcessing.collectAsState()
-        val animeEntries by viewModel.animeEntries.collectAsState()
-        val downloads by viewModel.downloads.collectAsState()
-        val logs by viewModel.logs.collectAsState()
-        val customTags by viewModel.customTags.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
+    val animeEntries by viewModel.animeEntries.collectAsState()
+    val downloads by viewModel.downloads.collectAsState()
+    val logs by viewModel.logs.collectAsState()
+    val customTags by viewModel.customTags.collectAsState()
 
-        var showTagManager by remember { mutableStateOf(false) }
-        var selectedTab by remember { mutableStateOf(0) }
-        val tabs = listOf("🎥 Import", "📁 Entries", "⬇️ Downloads", "📝 Logs")
+    var showTagManager by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("🎥 Import", "📁 Entries", "⬇️ Downloads", "📝 Logs")
 
-        val filePickerLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.OpenDocument()
-        ) { uri ->
-            uri?.let {
-                scope.launch { 
-                    try {
-                        viewModel.processMalFile(activity, it)
-                    } catch (e: Exception) {
-                        viewModel.log("❌ Error processing file: ${e.message}")
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch { 
+                viewModel.processMalFile(activity, it)
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = "MAL Downloader v3.0",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "25+ Dynamic Tags Edition",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
+                },
+                actions = {
+                    IconButton(onClick = { showTagManager = true }) {
+                        Icon(Icons.Default.Settings, "Manage Tags")
+                    }
+                    if (logs.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearLogs() }) {
+                            Icon(Icons.Default.Clear, "Clear Logs")
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
+        floatingActionButton = {
+            if (selectedTab == 0) {
+                FloatingActionButton(
+                    onClick = {
+                        filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, "Import XML")
                 }
             }
         }
-
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 0.dp
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
                             Text(
-                                text = "MAL Downloader v3.0",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "25+ Dynamic Tags Edition",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = { showTagManager = true }) {
-                            Icon(Icons.Default.Settings, "Manage Tags")
-                        }
-                        if (logs.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.clearLogs() }) {
-                                Icon(Icons.Default.Clear, "Clear Logs")
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                )
-            },
-            floatingActionButton = {
-                if (selectedTab == 0) {
-                    FloatingActionButton(
-                        onClick = {
-                            try {
-                                filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
-                            } catch (e: Exception) {
-                                viewModel.log("Error launching file picker: ${e.message}")
-                            }
-                        },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(Icons.Default.Add, "Import XML")
-                    }
                 }
             }
-        ) { paddingValues ->
-            Column(
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    modifier = Modifier.fillMaxWidth(),
-                    edgePadding = 0.dp
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            text = {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            }
-                        )
-                    }
+                when (selectedTab) {
+                    0 -> SafeImportTab(
+                        viewModel = viewModel,
+                        isProcessing = isProcessing,
+                        onImportClick = {
+                            filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
+                        },
+                        customTagsCount = customTags.size
+                    )
+                    1 -> SafeEntriesTab(
+                        viewModel = viewModel,
+                        entries = animeEntries
+                    )
+                    2 -> SafeDownloadsTab(
+                        viewModel = viewModel,
+                        downloads = downloads
+                    )
+                    3 -> SafeLogsTab(
+                        viewModel = viewModel,
+                        logs = logs
+                    )
                 }
+            }
+        }
+    }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    when (selectedTab) {
-                        0 -> SafeImportTab(
-                            viewModel = viewModel,
-                            isProcessing = isProcessing,
-                            onImportClick = {
-                                try {
-                                    filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
-                                } catch (e: Exception) {
-                                    viewModel.log("Error: ${e.message}")
-                                }
-                            },
-                            customTagsCount = customTags.size
-                        )
-                        1 -> SafeEntriesTab(
-                            viewModel = viewModel,
-                            entries = animeEntries
-                        )
-                        2 -> SafeDownloadsTab(
-                            viewModel = viewModel,
-                            downloads = downloads
-                        )
-                        3 -> SafeLogsTab(
-                            viewModel = viewModel,
-                            logs = logs
-                        )
-                    }
-                }
-            }
-        }
-
-        if (showTagManager) {
-            try {
-                TagManagerDialog(
-                    viewModel = viewModel,
-                    onDismiss = { showTagManager = false }
-                )
-            } catch (e: Exception) {
-                viewModel.log("Tag manager error: ${e.message}")
-                showTagManager = false
-            }
-        }
-    } catch (e: Exception) {
-        // Ultimate fallback UI
-        Surface {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "MAL Downloader v3.0",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Initialization Error:",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "${e.javaClass.simpleName}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "${e.message}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { (context as ComponentActivity).recreate() }) {
-                        Text("Retry")
-                    }
-                }
-            }
-        }
+    if (showTagManager) {
+        TagManagerDialog(
+            viewModel = viewModel,
+            onDismiss = { showTagManager = false }
+        )
     }
 }
 
@@ -488,86 +395,74 @@ fun SafeEntriesTab(
 ) {
     val scope = rememberCoroutineScope()
     
-    try {
-        Column {
-            if (entries.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+    Column {
+        if (entries.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${entries.size}",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text("Entries", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${entries.size}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text("Entries", style = MaterialTheme.typography.bodySmall)
+                    }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val totalTags = entries.sumOf { it.allTags.size }
-                            Text(
-                                text = "$totalTags",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            Text("Total Tags", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val totalTags = entries.sumOf { it.allTags.size }
+                        Text(
+                            text = "$totalTags",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text("Total Tags", style = MaterialTheme.typography.bodySmall)
+                    }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val avgTags = if (entries.isNotEmpty()) entries.sumOf { it.allTags.size } / entries.size else 0
-                            Text(
-                                text = "$avgTags",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                            Text("Avg Tags", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val avgTags = if (entries.isNotEmpty()) entries.sumOf { it.allTags.size } / entries.size else 0
+                        Text(
+                            text = "$avgTags",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text("Avg Tags", style = MaterialTheme.typography.bodySmall)
+                    }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val hentaiCount = entries.count { it.isHentai }
-                            Text(
-                                text = "$hentaiCount",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE91E63)
-                            )
-                            Text("Adult", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val hentaiCount = entries.count { it.isHentai }
+                        Text(
+                            text = "$hentaiCount",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE91E63)
+                        )
+                        Text("Adult", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            try {
-                EntriesList(
-                    viewModel = viewModel,
-                    entries = entries,
-                    onDownloadClick = { entry ->
-                        scope.launch { 
-                            try {
-                                viewModel.downloadImages(entry)
-                            } catch (e: Exception) {
-                                viewModel.log("❌ Download error: ${e.message}")
-                            }
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                Text("Error loading entries: ${e.message}")
-            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-    } catch (e: Exception) {
-        Text("Entries tab error: ${e.message}")
+
+        EntriesList(
+            viewModel = viewModel,
+            entries = entries,
+            onDownloadClick = { entry ->
+                scope.launch { 
+                    viewModel.downloadImages(entry)
+                }
+            }
+        )
     }
 }
 
@@ -576,56 +471,52 @@ fun SafeDownloadsTab(
     viewModel: MainViewModel,
     downloads: List<com.harry.maldownloader.data.DownloadItem>
 ) {
-    try {
-        if (downloads.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "⬇️",
-                        style = MaterialTheme.typography.headlineLarge
-                    )
-                    Text(
-                        text = "No downloads yet",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Import MAL entries and download them",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        } else {
-            Column {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        DownloadStat("Total", downloads.size.toString(), MaterialTheme.colorScheme.primary)
-                        DownloadStat("Active", downloads.count { it.status == "downloading" }.toString(), MaterialTheme.colorScheme.secondary)
-                        DownloadStat("Complete", downloads.count { it.status == "completed" }.toString(), Color(0xFF4CAF50))
-                        DownloadStat("Failed", downloads.count { it.status == "failed" }.toString(), MaterialTheme.colorScheme.error)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
+    if (downloads.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Download management UI will be enhanced in future updates",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp)
+                    text = "⬇️",
+                    style = MaterialTheme.typography.headlineLarge
+                )
+                Text(
+                    text = "No downloads yet",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Import MAL entries and download them",
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
-    } catch (e: Exception) {
-        Text("Downloads tab error: ${e.message}")
+    } else {
+        Column {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    DownloadStat("Total", downloads.size.toString(), MaterialTheme.colorScheme.primary)
+                    DownloadStat("Active", downloads.count { it.status == "downloading" }.toString(), MaterialTheme.colorScheme.secondary)
+                    DownloadStat("Complete", downloads.count { it.status == "completed" }.toString(), Color(0xFF4CAF50))
+                    DownloadStat("Failed", downloads.count { it.status == "failed" }.toString(), MaterialTheme.colorScheme.error)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Download management UI will be enhanced in future updates",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     }
 }
 
@@ -650,65 +541,55 @@ fun SafeLogsTab(
     viewModel: MainViewModel,
     logs: List<String>
 ) {
-    try {
-        Column {
-            if (logs.isNotEmpty()) {
-                Button(
-                    onClick = { 
-                        try {
-                            viewModel.clearLogs()
-                        } catch (e: Exception) {
-                            Log.e("SafeLogsTab", "Error clearing logs", e)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Clear, "Clear")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Clear Logs (${logs.size})")
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
+    Column {
+        if (logs.isNotEmpty()) {
+            Button(
+                onClick = { viewModel.clearLogs() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Clear, "Clear")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Clear Logs (${logs.size})")
             }
 
-            Card(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (logs.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Card(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (logs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Ready to process MAL XML!\n\nLogs will appear here during processing.\n\nAny crashes will be captured here too.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    logs.forEach { log ->
                         Text(
-                            text = "Ready to process MAL XML!\n\nLogs will appear here during processing.\n\nAny crashes will be captured here too.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(16.dp)
+                            text = log,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 1.dp),
+                            color = if (log.contains("FATAL")) Color.Red 
+                                   else if (log.contains("ERROR")) Color(0xFFFF6B35)
+                                   else if (log.contains("WARN")) Color(0xFFFF9800)
+                                   else MaterialTheme.colorScheme.onSurface
                         )
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        logs.forEach { log ->
-                            Text(
-                                text = log,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(vertical = 1.dp),
-                                color = if (log.contains("FATAL")) Color.Red 
-                                       else if (log.contains("ERROR")) Color(0xFFFF6B35)
-                                       else if (log.contains("WARN")) Color(0xFFFF9800)
-                                       else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
                     }
                 }
             }
         }
-    } catch (e: Exception) {
-        Text("Logs tab error: ${e.message}")
     }
 }
 
