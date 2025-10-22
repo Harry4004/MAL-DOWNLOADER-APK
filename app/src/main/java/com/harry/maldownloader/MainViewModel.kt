@@ -183,6 +183,8 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             synopsis = mal.synopsis,
             score = mal.mean?.toFloat(),
             status = mal.status,
+            chapters = mal.chapters,
+            volumes = mal.volumes,
             imageUrl = mal.main_picture?.large ?: mal.main_picture?.medium,
             allTags = tags.toList(),
             genres = mal.genres?.mapNotNull { it.name } ?: emptyList(),
@@ -217,14 +219,18 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         
         return entry.copy(
             title = data.title ?: entry.title,
+            englishTitle = data.title_english,
+            japaneseTitle = data.title_japanese,
             synopsis = data.synopsis,
             score = data.score?.toFloat(),
             status = data.status,
             episodes = data.episodes,
+            source = data.source,
             imageUrl = data.images?.jpg?.large_image_url ?: data.images?.jpg?.image_url,
             allTags = tags.toList(),
             genres = data.genres?.mapNotNull { it.name } ?: emptyList(),
             tags = tags.toList(),
+            studio = data.studios?.firstOrNull()?.name,
             isHentai = isHentai
         )
     }
@@ -251,9 +257,13 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         
         return entry.copy(
             title = data.title ?: entry.title,
+            englishTitle = data.title_english,
+            japaneseTitle = data.title_japanese,
             synopsis = data.synopsis,
             score = data.score?.toFloat(),
             status = data.status,
+            chapters = data.chapters,
+            volumes = data.volumes,
             imageUrl = data.images?.jpg?.large_image_url ?: data.images?.jpg?.image_url,
             allTags = tags.toList(),
             genres = data.genres?.mapNotNull { it.name } ?: emptyList(),
