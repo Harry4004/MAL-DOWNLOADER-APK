@@ -7,9 +7,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.harry.maldownloader.MainViewModel
 
@@ -32,25 +35,29 @@ fun LogsPanel(
                     .fillMaxWidth()
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Logs (${logs.size})",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    fontWeight = FontWeight.Bold
                 )
                 Row {
-                    IconButton(onClick = { viewModel.clearLogs() }) { Icon(Icons.Filled.Delete, "Clear Logs") }
-                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.Info, "Filter Logs") }
+                    IconButton(onClick = { viewModel.clearLogs() }) { 
+                        Icon(Icons.Filled.Delete, "Clear Logs") 
+                    }
+                    IconButton(onClick = { /* TODO: Filter logs */ }) { 
+                        Icon(Icons.Filled.Info, "Filter Logs") 
+                    }
                 }
             }
-            Divider()
+            HorizontalDivider()
             if (logs.isEmpty()) {
-                androidx.compose.foundation.layout.Box(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "No logs yet",
@@ -67,13 +74,15 @@ fun LogsPanel(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(logs) { log ->
+                    items(logs) { logEntry ->
                         Text(
-                            text = log,
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                            text = logEntry,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace
+                            ),
                             color = when {
-                                log.contains("ERROR") -> MaterialTheme.colorScheme.error
-                                log.contains("WARN") -> MaterialTheme.colorScheme.tertiary
+                                logEntry.contains("ERROR") -> MaterialTheme.colorScheme.error
+                                logEntry.contains("WARN") -> MaterialTheme.colorScheme.tertiary
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
