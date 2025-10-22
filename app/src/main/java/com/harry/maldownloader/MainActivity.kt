@@ -40,15 +40,45 @@ class MainActivity : ComponentActivity() {
 
     // Hold critical startup error to display in UI
     private val criticalError = mutableStateOf<Throwable?>(null)
+    private val isInitialized = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         Log.d("MainActivity", "Starting onCreate")
 
+        // Set content first to prevent black screen
+        setContent {
+            MaldownloaderTheme {
+                when {
+                    criticalError.value != null -> {
+                        ErrorScreen(error = criticalError.value!!)
+                    }
+                    !isInitialized.value -> {
+                        LoadingScreen()
+                    }
+                    else -> {
+                        SafeMainScreen(viewModel = viewModel)
+                    }
+                }
+            }
+        }
+
+        // Initialize in background to prevent blocking UI
+        initializeApp()
+    }
+
+    private fun initializeApp() {
         try {
             Log.d("MainActivity", "Initializing database")
-            val database = DownloadDatabase.getDatabase(this)
+            
+            // Get database from Application with null safety
+            val app = application as MainApplication
+            val database = app.database
+            
+            if (database == null) {
+                throw Exception("Database initialization failed in MainApplication")
+            }
 
             Log.d("MainActivity", "Initializing repository")
             repository = DownloadRepository(
@@ -62,24 +92,16 @@ class MainActivity : ComponentActivity() {
                 MainViewModelFactory(repository)
             )[MainViewModel::class.java]
 
-            Log.d("MainActivity", "Setting content")
-            setContent {
-                MaldownloaderTheme {
-                    if (criticalError.value != null) {
-                        ErrorScreen(error = criticalError.value!!)
-                    } else {
-                        SafeMainScreen(viewModel = viewModel)
-                    }
-                }
-            }
-
             Log.d("MainActivity", "Checking permissions")
             checkPermissions()
 
+            // Mark as initialized
+            isInitialized.value = true
             Log.d("MainActivity", "onCreate completed successfully")
+            
         } catch (e: Exception) {
             Log.e("MainActivity", "Critical error in onCreate", e)
-            criticalError.value = e // show error on screen, do not finish()
+            criticalError.value = e
         }
     }
 
@@ -139,7 +161,7 @@ class MainActivity : ComponentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         try {
-            if (requestCode == 1001) {
+            if (requestCode == 1001 && ::viewModel.isInitialized) {
                 permissions.forEachIndexed { index, permission ->
                     val granted = grantResults.getOrNull(index) == PackageManager.PERMISSION_GRANTED
                     when (permission) {
@@ -154,6 +176,38 @@ class MainActivity : ComponentActivity() {
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error handling permission result", e)
+        }
+    }
+}
+
+@Composable
+fun LoadingScreen() {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "🚀 Initializing MAL Downloader v3.0...",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Setting up database and features",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -174,15 +228,34 @@ fun ErrorScreen(error: Throwable) {
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Error Details:",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error.localizedMessage ?: "Unknown error",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = error.localizedMessage ?: "Unknown error",
-                style = MaterialTheme.typography.bodyMedium
+                text = "Troubleshooting:",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = error.stackTraceToString(),
-                style = MaterialTheme.typography.bodySmall
+                text = "• Restart the app\n• Clear app data\n• Reinstall if issue persists",
+                style = MaterialTheme.typography.bodyMedium
             )
         }
     }
@@ -602,7 +675,7 @@ fun SafeLogsTab(
                         text = logEntry,
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
         } else {
@@ -612,6 +685,7 @@ fun SafeLogsTab(
         }
     }
 }
+
 class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {

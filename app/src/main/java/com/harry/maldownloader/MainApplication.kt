@@ -12,8 +12,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainApplication : Application() {
+    
+    // Use singleton pattern to prevent multiple database instances
     val database by lazy {
-        DownloadDatabase.getDatabase(this)
+        try {
+            DownloadDatabase.getDatabase(this)
+        } catch (e: Exception) {
+            Log.e("MainApplication", "Database initialization failed", e)
+            // Return null to handle gracefully in MainActivity
+            null
+        }
     }
 
     override fun onCreate() {
@@ -22,24 +30,26 @@ class MainApplication : Application() {
         Log.d("MainApplication", "Starting application initialization")
 
         try {
-            // Global crash logger to capture uncaught exceptions into Logs tab
+            // Set up global crash handler with null safety
             Thread.setDefaultUncaughtExceptionHandler { t, e ->
                 Log.e("AppCrash", "Fatal crash in thread ${t.name}", e)
                 
-                // Launch coroutine to write to database
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        database.logDao().insertLog(
-                            DownloadLog(
-                                downloadId = "app",
-                                level = "FATAL",
-                                message = "Uncaught crash in ${t.name}: ${e.javaClass.simpleName} - ${e.message}",
-                                exception = e.stackTraceToString()
+                // Only attempt database logging if database is available
+                database?.let { db ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            db.logDao().insertLog(
+                                DownloadLog(
+                                    downloadId = "app",
+                                    level = "FATAL",
+                                    message = "Uncaught crash in ${t.name}: ${e.javaClass.simpleName} - ${e.message}",
+                                    exception = e.stackTraceToString()
+                                )
                             )
-                        )
-                        Log.d("AppCrash", "Crash logged to database successfully")
-                    } catch (dbError: Exception) {
-                        Log.e("AppCrash", "Failed to log crash to database", dbError)
+                            Log.d("AppCrash", "Crash logged to database successfully")
+                        } catch (dbError: Exception) {
+                            Log.e("AppCrash", "Failed to log crash to database", dbError)
+                        }
                     }
                 }
                 
@@ -53,6 +63,7 @@ class MainApplication : Application() {
             Log.d("MainApplication", "Application initialization completed successfully")
         } catch (e: Exception) {
             Log.e("MainApplication", "Critical error during application initialization", e)
+            // Don't crash the app, let MainActivity handle graceful degradation
         }
     }
 
