@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import com.harry.maldownloader.data.DownloadDatabase
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.EntriesList
 import com.harry.maldownloader.ui.components.TagManagerDialog
