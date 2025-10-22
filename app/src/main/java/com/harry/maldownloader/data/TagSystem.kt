@@ -27,26 +27,23 @@ data class TagConfiguration(
 
 class TagSystem(private val context: Context) {
     private val gson = Gson()
-    
+
     companion object {
         private val TAG_CONFIG_KEY = stringPreferencesKey("tag_configuration")
         private val CUSTOM_TAGS_KEY = stringPreferencesKey("custom_tags")
     }
-    
+
     val tagConfiguration: Flow<TagConfiguration> = context.dataStore.data
         .map { preferences ->
-            val json = preferences[TAG_CONFIG_KEY]
-            if (json != null) {
+            preferences[TAG_CONFIG_KEY]?.let {
                 try {
-                    gson.fromJson(json, TagConfiguration::class.java)
+                    gson.fromJson(it, TagConfiguration::class.java)
                 } catch (e: Exception) {
                     TagConfiguration()
                 }
-            } else {
-                TagConfiguration()
-            }
+            } ?: TagConfiguration()
         }
-    
+
     val customTags: Flow<Map<String, List<String>>> = context.dataStore.data
         .map { preferences ->
             val json = preferences[CUSTOM_TAGS_KEY] ?: "{}"
@@ -57,13 +54,13 @@ class TagSystem(private val context: Context) {
                 emptyMap()
             }
         }
-    
+
     suspend fun updateTagConfiguration(config: TagConfiguration) {
         context.dataStore.edit { preferences ->
             preferences[TAG_CONFIG_KEY] = gson.toJson(config)
         }
     }
-    
+
     suspend fun addCustomTag(entryId: String, tag: String) {
         context.dataStore.edit { preferences ->
             val currentJson = preferences[CUSTOM_TAGS_KEY] ?: "{}"
@@ -73,12 +70,12 @@ class TagSystem(private val context: Context) {
             } catch (e: Exception) {
                 mutableMapOf()
             }
-            
+
             currentMap[entryId] = (currentMap[entryId] ?: emptyList()) + tag
             preferences[CUSTOM_TAGS_KEY] = gson.toJson(currentMap)
         }
     }
-    
+
     suspend fun removeCustomTag(entryId: String, tag: String) {
         context.dataStore.edit { preferences ->
             val currentJson = preferences[CUSTOM_TAGS_KEY] ?: "{}"
@@ -88,7 +85,7 @@ class TagSystem(private val context: Context) {
             } catch (e: Exception) {
                 mutableMapOf()
             }
-            
+
             currentMap[entryId] = (currentMap[entryId] ?: emptyList()) - tag
             if (currentMap[entryId]?.isEmpty() == true) {
                 currentMap.remove(entryId)
@@ -96,12 +93,11 @@ class TagSystem(private val context: Context) {
             preferences[CUSTOM_TAGS_KEY] = gson.toJson(currentMap)
         }
     }
-    
+
     fun exportTagsToJson(): String {
-        // This will be called from UI thread with current tag state
         return gson.toJson(TagConfiguration())
     }
-    
+
     suspend fun importTagsFromJson(json: String): Result<TagConfiguration> {
         return try {
             val config = gson.fromJson(json, TagConfiguration::class.java)
@@ -111,26 +107,24 @@ class TagSystem(private val context: Context) {
             Result.failure(e)
         }
     }
-    
+
     fun classifyEntry(title: String, type: String): List<String> {
         val tags = mutableListOf<String>()
         val lowerTitle = title.lowercase()
-        
-        // Auto-classify based on content
+
         when {
             type.contains("hentai", true) -> tags.add("Hentai")
-            type.contains("manga", true) -> tags.add("Manga") 
+            type.contains("manga", true) -> tags.add("Manga")
             else -> tags.add("Anime")
         }
-        
-        // Genre detection
+
         when {
             lowerTitle.contains("action") -> tags.add("Action")
             lowerTitle.contains("comedy") -> tags.add("Comedy")
             lowerTitle.contains("romance") -> tags.add("Romance")
             lowerTitle.contains("drama") -> tags.add("Drama")
         }
-        
+
         return tags
     }
 }
