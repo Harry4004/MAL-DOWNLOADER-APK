@@ -69,7 +69,8 @@ fun LogsPanel(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp),
+                        .weight(1f) // <--- important, expands to fill available space in parent
+                        .padding(bottom = 20.dp),
                     reverseLayout = true,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
