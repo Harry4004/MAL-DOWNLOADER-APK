@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.EntriesList
@@ -682,5 +683,16 @@ fun SafeLogsTab(
                 Text("No logs available", style = MaterialTheme.typography.bodyMedium)
             }
         }
+    }
+}
+
+// MainViewModelFactory class definition
+class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MainViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
