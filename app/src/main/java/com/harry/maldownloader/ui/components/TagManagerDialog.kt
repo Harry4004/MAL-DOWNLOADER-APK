@@ -42,7 +42,6 @@ fun TagManagerDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Add Tag Button
                 Button(
                     onClick = { showAddDialog = true },
                     modifier = Modifier.fillMaxWidth()
@@ -52,7 +51,6 @@ fun TagManagerDialog(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // View Tags Button
                 OutlinedButton(
                     onClick = { showViewDialog = true },
                     modifier = Modifier.fillMaxWidth()
@@ -62,7 +60,6 @@ fun TagManagerDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Close Button
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
@@ -73,20 +70,11 @@ fun TagManagerDialog(
         }
     }
     
-    // Add Tag Dialog
     if (showAddDialog) {
-        AddTagDialog(
-            viewModel = viewModel,
-            onDismiss = { showAddDialog = false }
-        )
+        AddTagDialog(viewModel, onDismiss = { showAddDialog = false })
     }
-    
-    // View Tags Dialog
     if (showViewDialog) {
-        ViewTagsDialog(
-            viewModel = viewModel,
-            onDismiss = { showViewDialog = false }
-        )
+        ViewTagsDialog(viewModel, onDismiss = { showViewDialog = false })
     }
 }
 
@@ -117,7 +105,6 @@ fun AddTagDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Type Selection
                 Text("Select Category:")
                 types.forEach { type ->
                     Row(
@@ -143,7 +130,6 @@ fun AddTagDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Tag Input
                 OutlinedTextField(
                     value = tagText,
                     onValueChange = { tagText = it },
@@ -154,7 +140,6 @@ fun AddTagDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -168,13 +153,13 @@ fun AddTagDialog(
                     
                     Button(
                         onClick = {
-                            if (tagText.isNotEmpty()) {
-                                viewModel.addCustomTag(selectedType.lowercase(), tagText)
+                            if (tagText.isNotBlank()) {
+                                viewModel.addCustomTag(tagText.trim())
                                 viewModel.log("✅ Added $selectedType tag: $tagText")
                                 onDismiss()
                             }
                         },
-                        enabled = tagText.isNotEmpty(),
+                        enabled = tagText.isNotBlank(),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Add")
@@ -228,13 +213,7 @@ fun ViewTagsDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(customTags) { tag ->
-                            TagItem(
-                                tag = tag,
-                                onRemove = {
-                                    viewModel.removeCustomTag(tag)
-                                    viewModel.log("🗑️ Removed tag: $tag")
-                                }
-                            )
+                            TagItem(tag) { viewModel.removeCustomTag(it) }
                         }
                     }
                 }
@@ -255,7 +234,7 @@ fun ViewTagsDialog(
 @Composable
 fun TagItem(
     tag: String,
-    onRemove: () -> Unit
+    onRemove: (String) -> Unit
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
     
@@ -263,9 +242,9 @@ fun TagItem(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when {
-                tag.startsWith("Anime:") -> Color(0xFF3F51B5).copy(alpha = 0.1f)
-                tag.startsWith("Manga:") -> Color(0xFF4CAF50).copy(alpha = 0.1f)
-                tag.startsWith("Hentai:") -> Color(0xFFE91E63).copy(alpha = 0.1f)
+                tag.startsWith("Anime") -> Color(0xFF3F51B5).copy(alpha = 0.1f)
+                tag.startsWith("Manga") -> Color(0xFF4CAF50).copy(alpha = 0.1f)
+                tag.startsWith("Hentai") -> Color(0xFFE91E63).copy(alpha = 0.1f)
                 else -> MaterialTheme.colorScheme.surfaceVariant
             }
         )
@@ -294,16 +273,15 @@ fun TagItem(
         }
     }
     
-    // Remove confirmation dialog
     if (showRemoveDialog) {
         AlertDialog(
             onDismissRequest = { showRemoveDialog = false },
             title = { Text("Remove Tag?") },
-            text = { Text("Are you sure you want to remove\\n$tag?") },
+            text = { Text("Are you sure you want to remove\n$tag?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        onRemove()
+                        onRemove(tag)
                         showRemoveDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
