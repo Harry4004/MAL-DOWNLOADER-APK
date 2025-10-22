@@ -24,12 +24,12 @@ fun LogsPanel(
     val logs by viewModel.logs.collectAsState()
 
     Card(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize(), // fill parent for full yellow area utilization
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -56,7 +56,7 @@ fun LogsPanel(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
+                        .weight(1f), // also weight for empty state
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -69,8 +69,7 @@ fun LogsPanel(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f) // <--- important, expands to fill available space in parent
-                        .padding(bottom = 20.dp),
+                        .weight(1f), // fill all scrollable space
                     reverseLayout = true,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
