@@ -12,11 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainApplication : Application() {
-    companion object {
-        // Central MAL Client ID provider (replace via CI/Secrets if needed)
-        const val MAL_CLIENT_ID: String = "aaf018d4c098158bd890089f32125add"
-    }
-
     val database by lazy {
         try { DownloadDatabase.getDatabase(this) } catch (e: Exception) {
             Log.e("MainApplication", "Database initialization failed", e)
@@ -64,5 +59,9 @@ class MainApplication : Application() {
             val manager = getSystemService(NotificationManager::class.java)
             channels.forEach { manager.createNotificationChannel(it) }
         }
+    }
+
+    companion object {
+        val MAL_CLIENT_ID: String get() = BuildConfig.MAL_CLIENT_ID
     }
 }
