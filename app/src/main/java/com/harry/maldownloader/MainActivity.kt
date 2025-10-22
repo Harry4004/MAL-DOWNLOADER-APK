@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import com.harry.maldownloader.data.DownloadDatabase
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.EntriesList
 import com.harry.maldownloader.ui.components.TagManagerDialog
@@ -38,26 +40,32 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        try {
+            // Initialize database and repository safely
+            val database = DownloadDatabase.getDatabase(this)
+            repository = DownloadRepository(
+                context = this,
+                database = database
+            )
 
-        // Initialize repository and ViewModel
-        repository = DownloadRepository(
-            context = this,
-            database = DownloadRepository.getDatabase(this)
-        )
+            viewModel = ViewModelProvider(
+                this,
+                MainViewModelFactory(repository)
+            )[MainViewModel::class.java]
 
-        viewModel = ViewModelProvider(
-            this,
-            MainViewModelFactory(repository)
-        )[MainViewModel::class.java]
-
-        setContent {
-            MaldownloaderTheme {
-                MainScreen(viewModel = viewModel)
+            setContent {
+                MaldownloaderTheme {
+                    MainScreen(viewModel = viewModel)
+                }
             }
-        }
 
-        // Check and request permissions
-        checkPermissions()
+            checkPermissions()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to initialize app", e)
+            // Show error and finish
+            finish()
+        }
     }
 
     private fun checkPermissions() {
@@ -148,7 +156,13 @@ fun MainScreen(viewModel: MainViewModel) {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
-            scope.launch { viewModel.processMalFile(activity, it) }
+            scope.launch { 
+                try {
+                    viewModel.processMalFile(activity, it)
+                } catch (e: Exception) {
+                    viewModel.log("❌ Error processing file: ${e.message}")
+                }
+            }
         }
     }
 
@@ -431,7 +445,13 @@ fun EntriesTab(
             viewModel = viewModel,
             entries = entries,
             onDownloadClick = { entry ->
-                scope.launch { viewModel.downloadImages(entry) }
+                scope.launch { 
+                    try {
+                        viewModel.downloadImages(entry)
+                    } catch (e: Exception) {
+                        viewModel.log("❌ Download error: ${e.message}")
+                    }
+                }
             }
         )
     }
