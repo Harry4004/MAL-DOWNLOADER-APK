@@ -58,12 +58,12 @@ fun ItemDetailsBottomSheet(
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                DetailRowShared("Type", entry.type)
-                DetailRowShared("Episodes", "${entry.episodesWatched ?: 0}/${entry.totalEpisodes ?: "?"}")
-                DetailRowShared("Score", "${entry.score ?: 0f}/10")
-                entry.status?.let { DetailRowShared("Status", it) }
-                entry.startDate?.let { DetailRowShared("Started", it) }
-                entry.endDate?.let { DetailRowShared("Finished", it) }
+                DetailRow("Type", entry.type)
+                DetailRow("Episodes", "${entry.episodesWatched ?: 0}/${entry.totalEpisodes ?: "?"}")
+                DetailRow("Score", "${entry.score ?: 0f}/10")
+                entry.status?.let { DetailRow("Status", it) }
+                entry.startDate?.let { DetailRow("Started", it) }
+                entry.endDate?.let { DetailRow("Finished", it) }
             }
         }
         if (!entry.synopsis.isNullOrEmpty()) {
@@ -117,16 +117,5 @@ fun ItemDetailsBottomSheet(
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-    }
-}
-
-@Composable
-fun DetailRowShared(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
