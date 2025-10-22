@@ -133,14 +133,14 @@ fun AnimeEntryCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 entry.status?.let {
-                    DetailRowShared(label = "Status", value = it)
+                    DetailRow(label = "Status", value = it)
                 }
-                DetailRowShared(label = "Type", value = entry.type)
-                entry.startDate?.let { DetailRowShared(label = "Start Date", value = it) }
-                entry.endDate?.let { DetailRowShared(label = "End Date", value = it) }
+                DetailRow(label = "Type", value = entry.type)
+                entry.startDate?.let { DetailRow(label = "Start Date", value = it) }
+                entry.endDate?.let { DetailRow(label = "End Date", value = it) }
                 val tagsText = (entry.tags ?: emptyList()).joinToString(", ")
                 if (tagsText.isNotBlank()) {
-                    DetailRowShared(label = "Tags", value = tagsText)
+                    DetailRow(label = "Tags", value = tagsText)
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -235,29 +235,5 @@ fun AnimeEntryCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun DetailRowShared(
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
     }
 }
