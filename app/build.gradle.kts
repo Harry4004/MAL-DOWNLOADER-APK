@@ -151,4 +151,13 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose:compose-bom:2024.02.00")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // DataStore (for TagSystem.kt)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Coil Compose (for ItemDetailsBottomSheet.kt)
+    implementation("io.coil-kt:coil-compose:2.5.0") // Use 2.5.0 to match your other coil version
+
+    // Gson (for TagSystem.kt)
+    implementation("com.google.code.gson:gson:2.11.0")
+
 }
