@@ -7,19 +7,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.harry.maldownloader.MainViewModel
 
 @Composable
 fun LogsPanel(
-    logs: List<String>,
-    onClearLogs: () -> Unit,
+    viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val logs by viewModel.logs.collectAsState()
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -32,25 +32,25 @@ fun LogsPanel(
                     .fillMaxWidth()
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 Text(
                     text = "Logs (${logs.size})",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
                 Row {
-                    IconButton(onClick = onClearLogs) { Icon(Icons.Filled.Delete, contentDescription = "Clear Logs") }
-                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.Info, contentDescription = "Filter Logs") }
+                    IconButton(onClick = { viewModel.clearLogs() }) { Icon(Icons.Filled.Delete, "Clear Logs") }
+                    IconButton(onClick = { /* TODO: Filter logs */ }) { Icon(Icons.Filled.Info, "Filter Logs") }
                 }
             }
             Divider()
             if (logs.isEmpty()) {
-                Box(
+                androidx.compose.foundation.layout.Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
                     Text(
                         text = "No logs yet",
@@ -70,7 +70,7 @@ fun LogsPanel(
                     items(logs) { log ->
                         Text(
                             text = log,
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                             color = when {
                                 log.contains("ERROR") -> MaterialTheme.colorScheme.error
                                 log.contains("WARN") -> MaterialTheme.colorScheme.tertiary
