@@ -159,5 +159,13 @@ dependencies {
 
     // Gson (for TagSystem.kt)
     implementation("com.google.code.gson:gson:2.11.0")
+    // DataStore (for TagSystem.kt)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Coil Compose (for ItemDetailsBottomSheet.kt)
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Gson (for TagSystem.kt)
+    implementation("com.google.code.gson:gson:2.11.0")
 }
+
