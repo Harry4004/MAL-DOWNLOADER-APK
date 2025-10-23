@@ -9,8 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,8 +21,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -311,6 +321,223 @@ fun ErrorScreen(error: Throwable) {
     }
 }
 
+// AVES-Style Modern Drawer Component
+@Composable
+fun ModernDrawer(
+    onClose: () -> Unit,
+    onCustomTagsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onAboutClick: () -> Unit,
+    storagePermissionGranted: Boolean,
+    notificationPermissionGranted: Boolean
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(320.dp),
+        color = Color.Black.copy(alpha = 0.85f),
+        shape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
+    ) {
+        Box {
+            // Glass blur effect background
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.1f),
+                                Color.White.copy(alpha = 0.05f)
+                            )
+                        )
+                    )
+            )
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+            ) {
+                // Header with close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "📱 MAL Downloader Menu",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .semantics { 
+                                contentDescription = "Close menu"
+                                role = Role.Button
+                            }
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                // Permission Status Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.15f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.BarChart,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Permission Status",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        PermissionStatusRow(
+                            "Storage", 
+                            storagePermissionGranted
+                        )
+                        PermissionStatusRow(
+                            "Notifications", 
+                            notificationPermissionGranted
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Menu items
+                MenuItemWithIcon(
+                    icon = Icons.Default.Tag,
+                    title = "Custom Tags Manager",
+                    subtitle = "Organize your collection",
+                    onClick = {
+                        onClose()
+                        onCustomTagsClick()
+                    }
+                )
+                
+                MenuItemWithIcon(
+                    icon = Icons.Default.Settings,
+                    title = "Settings",
+                    subtitle = "App configuration",
+                    onClick = {
+                        onClose()
+                        onSettingsClick()
+                    }
+                )
+                
+                MenuItemWithIcon(
+                    icon = Icons.Default.Info,
+                    title = "About",
+                    subtitle = "App information",
+                    onClick = {
+                        onClose()
+                        onAboutClick()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PermissionStatusRow(name: String, granted: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            imageVector = if (granted) Icons.Default.CheckCircle else Icons.Default.Error,
+            contentDescription = null,
+            tint = if (granted) Color.Green else Color.Red,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "$name: ${if (granted) "Granted" else "Denied"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.9f)
+        )
+    }
+}
+
+@Composable
+fun MenuItemWithIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.1f)
+        ),
+        shape = RoundedCornerShape(12.dp),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafeMainScreen(viewModel: MainViewModel) {
@@ -327,7 +554,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     val notificationPermissionGranted by viewModel.notificationPermissionGranted.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
-    var showDrawer by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
     var showTagManager by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -360,119 +587,42 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     }
 
     ModalNavigationDrawer(
-        drawerState = rememberDrawerState(initialValue = if (showDrawer) DrawerValue.Open else DrawerValue.Closed),
+        drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "📱 MAL Downloader Menu",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        IconButton(onClick = { showDrawer = false }) {
-                            Icon(Icons.Default.Close, "Close Menu")
+            ModernDrawer(
+                onClose = {
+                    scope.launch {
+                        drawerState.close()
+                    }
+                },
+                onCustomTagsClick = {
+                    viewModel.log("🏷️ Opening Custom Tags Manager")
+                    showTagManager = true
+                },
+                onSettingsClick = {
+                    viewModel.log("🔧 Opening Settings")
+                    showSettings = true
+                },
+                onAboutClick = {
+                    viewModel.log("ℹ️ Opening About")
+                    showAbout = true
+                },
+                storagePermissionGranted = storagePermissionGranted,
+                notificationPermissionGranted = notificationPermissionGranted
+            )
+        },
+        gesturesEnabled = true,
+        modifier = Modifier.pointerInput(Unit) {
+            detectDragGestures(
+                onDragStart = { offset ->
+                    // Detect swipe from right edge (90% of screen width)
+                    if (offset.x > size.width * 0.9f) {
+                        scope.launch { 
+                            drawerState.open() 
                         }
                     }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Permission Status Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (storagePermissionGranted) 
-                                MaterialTheme.colorScheme.primaryContainer 
-                            else 
-                                MaterialTheme.colorScheme.errorContainer
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "📊 Permission Status",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (storagePermissionGranted) Icons.Default.CheckCircle else Icons.Default.Error,
-                                    contentDescription = null,
-                                    tint = if (storagePermissionGranted) Color.Green else Color.Red,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Storage: ${if (storagePermissionGranted) "Granted" else "Denied"}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (notificationPermissionGranted) Icons.Default.CheckCircle else Icons.Default.Error,
-                                    contentDescription = null,
-                                    tint = if (notificationPermissionGranted) Color.Green else Color.Red,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Notifications: ${if (notificationPermissionGranted) "Granted" else "Denied"}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Label, null) },
-                        label = { Text("🏷️ Custom Tags Manager") },
-                        selected = false,
-                        onClick = {
-                            viewModel.log("🏷️ Opening Custom Tags Manager")
-                            showDrawer = false
-                            showTagManager = true
-                        }
-                    )
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Settings, null) },
-                        label = { Text("🔧 Settings") },
-                        selected = false,
-                        onClick = {
-                            viewModel.log("🔧 Opening Settings")
-                            showDrawer = false
-                            showSettings = true
-                        }
-                    )
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Info, null) },
-                        label = { Text("ℹ️ About") },
-                        selected = false,
-                        onClick = {
-                            viewModel.log("ℹ️ Opening About")
-                            showDrawer = false
-                            showAbout = true
-                        }
-                    )
                 }
-            }
+            ) { _, _ -> }
         }
     ) {
         Scaffold(
@@ -492,16 +642,48 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             )
                         }
                     },
-                    actions = {
-                        IconButton(onClick = { showDrawer = !showDrawer }) {
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    if (drawerState.isClosed) {
+                                        drawerState.open()
+                                    } else {
+                                        drawerState.close()
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics {
+                                    contentDescription = "Open navigation menu"
+                                    role = Role.Button
+                                }
+                        ) {
                             Icon(
-                                imageVector = if (showDrawer) Icons.Default.Close else Icons.Default.Menu,
-                                contentDescription = if (showDrawer) "Close Menu" else "Open Menu"
+                                Icons.Default.Menu,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
-                        if (logs.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.clearLogs() }) {
-                                Icon(Icons.Default.Clear, "Clear Logs")
+                    },
+                    actions = {
+                        // Only show clear logs button in Logs tab
+                        if (selectedTab == 3 && logs.isNotEmpty()) {
+                            IconButton(
+                                onClick = { viewModel.clearLogs() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .semantics {
+                                        contentDescription = "Clear all logs"
+                                        role = Role.Button
+                                    }
+                            ) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
                         }
                     },
