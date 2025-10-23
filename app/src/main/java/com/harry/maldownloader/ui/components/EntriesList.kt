@@ -35,6 +35,32 @@ fun EntriesList(
     var selectedType by remember { mutableStateOf("ALL") }
     var sortBy by remember { mutableStateOf("TITLE") }
     
+    // Filter entries based on search and type
+    val filteredEntries = remember(entries, searchQuery, selectedType, sortBy) {
+        val filtered = entries.filter { entry ->
+            val typeMatch = when (selectedType) {
+                "ANIME" -> entry.type == "anime"
+                "MANGA" -> entry.type == "manga"
+                else -> true
+            }
+            
+            val searchMatch = if (searchQuery.isBlank()) true else {
+                entry.title.contains(searchQuery, ignoreCase = true) ||
+                entry.englishTitle?.contains(searchQuery, ignoreCase = true) == true ||
+                entry.malId.toString().contains(searchQuery)
+            }
+            
+            typeMatch && searchMatch
+        }
+        
+        // Sort filtered results
+        when (sortBy) {
+            "SCORE" -> filtered.sortedByDescending { it.score ?: 0f }
+            "TAGS" -> filtered.sortedByDescending { it.allTags.size }
+            else -> filtered.sortedBy { it.title }
+        }
+    }
+    
     Column(modifier = Modifier.fillMaxSize()) {
         // Enhanced search and filter bar
         Card(
@@ -66,17 +92,23 @@ fun EntriesList(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected = selectedType != "ALL",
-                        onClick = { 
-                            selectedType = when (selectedType) {
-                                "ALL" -> "ANIME"
-                                "ANIME" -> "MANGA"
-                                else -> "ALL"
+                    val types = listOf("ALL", "ANIME", "MANGA")
+                    types.forEach { type ->
+                        FilterChip(
+                            selected = selectedType == type,
+                            onClick = { selectedType = type },
+                            label = { 
+                                val count = when (type) {
+                                    "ANIME" -> entries.count { it.type == "anime" }
+                                    "MANGA" -> entries.count { it.type == "manga" }
+                                    else -> entries.size
+                                }
+                                Text("$type ($count)") 
                             }
-                        },
-                        label = { Text(selectedType) }
-                    )
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.weight(1f))
                     
                     FilterChip(
                         selected = sortBy != "TITLE",
@@ -90,13 +122,23 @@ fun EntriesList(
                         label = { Text("🔄 $sortBy") }
                     )
                 }
+                
+                // Quick stats
+                if (entries.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Showing ${filteredEntries.size} of ${entries.size} entries",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
         
         // Entries list
-        if (entries.isEmpty()) {
+        if (filteredEntries.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxSize(),
                 colors = CardDefaults.cardColors(
@@ -109,16 +151,19 @@ fun EntriesList(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "📂",
+                            text = if (entries.isEmpty()) "📂" else "🔍",
                             style = MaterialTheme.typography.headlineLarge
                         )
                         Text(
-                            text = "No entries loaded",
+                            text = if (entries.isEmpty()) "No entries loaded" else "No matching entries",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Import a MAL XML file to see your collection",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = if (entries.isEmpty()) 
+                                "Import a MAL XML file to see your collection" else
+                                "Try adjusting your search or filters",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -128,109 +173,266 @@ fun EntriesList(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(entries) { entry ->
+                items(filteredEntries) { entry ->
                     EntryCard(
                         entry = entry,
+                        viewModel = viewModel,
                         onDownloadClick = { onDownloadClick(entry) },
-                        onTagsPreview = { 
-                            val tagsText = entry.allTags.take(10).joinToString(", ")
-                            viewModel.log("🏷️ Tags for ${entry.title}: $tagsText") 
+                        onViewDetailsClick = {
+                            val details = buildString {
+                                appendLine("📊 ${entry.title}")
+                                appendLine("🆔 Type: ${entry.type.uppercase()}")
+                                appendLine("🔢 MAL ID: ${entry.malId}")
+                                entry.score?.let { appendLine("⭐ Score: $it") }
+                                entry.episodes?.let { if (it > 0) appendLine("🎥 Episodes: $it") }
+                                entry.chapters?.let { if (it > 0) appendLine("📚 Chapters: $it") }
+                                if (entry.allTags.isNotEmpty()) {
+                                    appendLine("🏷️ Tags: ${entry.allTags.take(10).joinToString(", ")}")
+                                    if (entry.allTags.size > 10) appendLine("...and ${entry.allTags.size - 10} more")
+                                }
+                                entry.synopsis?.let { appendLine("📝 Synopsis: ${it.take(200)}...") }
+                            }
+                            viewModel.log(details)
+                        },
+                        onOpenMalClick = {
+                            try {
+                                val malUrl = "https://myanimelist.net/${entry.type}/${entry.malId}"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(malUrl))
+                                context.startActivity(intent)
+                                viewModel.log("🌐 Opening MAL page: ${entry.title}")
+                            } catch (e: Exception) {
+                                viewModel.log("❌ Could not open MAL page: ${e.message}")
+                            }
                         }
                     )
                 }
             }
         }
     }
-    
-    // Clear confirmation dialog
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear Logs?") },
-            text = { Text("This will remove all ${logs.size} log entries.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.clearLogs()
-                        showClearDialog = false
-                    }
-                ) {
-                    Text("Clear")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EntryCard(
     entry: AnimeEntry,
+    viewModel: MainViewModel,
     onDownloadClick: () -> Unit,
-    onTagsPreview: () -> Unit
+    onViewDetailsClick: () -> Unit,
+    onOpenMalClick: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+    val isDownloaded = !entry.imagePath.isNullOrEmpty()
+    val hasImageUrl = !entry.imageUrl.isNullOrEmpty()
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = entry.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = entry.type.uppercase(),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                
-                Text(
-                    text = "MAL: ${entry.malId}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                entry.isHentai -> Color(0xFFE91E63).copy(alpha = 0.1f)
+                entry.type == "anime" -> Color(0xFF3F51B5).copy(alpha = 0.1f)
+                entry.type == "manga" -> Color(0xFF4CAF50).copy(alpha = 0.1f)
+                else -> MaterialTheme.colorScheme.surfaceVariant
             }
-            
-            if (entry.allTags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "🏷️ ${entry.allTags.size} tags",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header with title and menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    if (!entry.englishTitle.isNullOrEmpty() && entry.englishTitle != entry.title) {
+                        Text(
+                            text = entry.englishTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.MoreVert,
+                            contentDescription = "Actions",
+                            tint = if (isDownloaded) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        if (hasImageUrl && !isDownloaded) {
+                            DropdownMenuItem(
+                                text = { Text("📥 Download") },
+                                onClick = {
+                                    onDownloadClick()
+                                    showMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.Download, null) }
+                            )
+                        }
+                        
+                        DropdownMenuItem(
+                            text = { Text("📊 Details") },
+                            onClick = {
+                                onViewDetailsClick()
+                                showMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.Info, null) }
+                        )
+                        
+                        DropdownMenuItem(
+                            text = { Text("🌐 Open MAL") },
+                            onClick = {
+                                onOpenMalClick()
+                                showMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.OpenInNew, null) }
+                        )
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))
             
+            // Type and metadata
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AssistChip(
+                    onClick = { },
+                    label = {
+                        Text(
+                            text = entry.type.uppercase(),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = when (entry.type) {
+                            "anime" -> Color(0xFF3F51B5).copy(alpha = 0.2f)
+                            "manga" -> Color(0xFF4CAF50).copy(alpha = 0.2f)
+                            else -> MaterialTheme.colorScheme.secondaryContainer
+                        }
+                    )
+                )
+                
+                if (entry.isHentai) {
+                    AssistChip(
+                        onClick = { },
+                        label = {
+                            Text(
+                                text = "18+",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = Color(0xFFE91E63).copy(alpha = 0.2f)
+                        )
+                    )
+                }
+                
+                Text(
+                    text = "MAL-${entry.malId}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (entry.score != null && entry.score > 0) {
+                    Text(
+                        text = "⭐ ${String.format("%.1f", entry.score)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFFFC107)
+                    )
+                }
+            }
+            
+            // Synopsis
+            if (!entry.synopsis.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = entry.synopsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Tags preview
+            if (entry.allTags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "🏷️ ${entry.allTags.size} tags: ${entry.allTags.take(5).joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Action buttons
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = onTagsPreview,
+                    onClick = onViewDetailsClick,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Preview Tags")
+                    Icon(Icons.Default.Info, null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Details")
                 }
                 
-                Button(
-                    onClick = onDownloadClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("⬇️ Download")
+                if (hasImageUrl) {
+                    Button(
+                        onClick = onDownloadClick,
+                        modifier = Modifier.weight(1f),
+                        colors = if (isDownloaded) {
+                            ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50)
+                            )
+                        } else {
+                            ButtonDefaults.buttonColors()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isDownloaded) "Downloaded" else "Download")
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { 
+                            viewModel.log("⚠️ No image URL available for ${entry.title}")
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = false
+                    ) {
+                        Icon(Icons.Default.Warning, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("No Image")
+                    }
                 }
             }
         }
