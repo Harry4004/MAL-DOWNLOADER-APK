@@ -390,9 +390,25 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private fun recordDownload(entry: AnimeEntry, url: String, path: String?, status: String, error: String? = null) {
         viewModelScope.launch {
             try {
-                val downloadItem = DownloadItem(UUID.randomUUID().toString(), url, path?.let { File(it).name } ?: "unknown.jpg", entry.malId.toString(), entry.title, entry.type, status, if (status == "completed") 100 else 0, error, System.currentTimeMillis(), if (status == "completed") System.currentTimeMillis() else null)
-                val current = _downloads.value.toMutableList(); current.add(downloadItem); _downloads.value = current
-            } catch (e: Exception) { log("⚠️ Failed to record download: ${e.message}") }
+                val downloadItem = DownloadItem(
+                    id = UUID.randomUUID().toString(),
+                    url = url,
+                    fileName = path?.let { File(it).name } ?: "unknown.jpg",
+                    malId = entry.malId.toString(),
+                    title = entry.title,
+                    imageType = entry.type,
+                    status = status,
+                    progress = if (status == "completed") 100 else 0,
+                    errorMessage = error,
+                    createdAt = System.currentTimeMillis(),
+                    completedAt = if (status == "completed") System.currentTimeMillis() else null
+                )
+                val current = _downloads.value.toMutableList()
+                current.add(downloadItem)
+                _downloads.value = current
+            } catch (e: Exception) {
+                log("⚠️ Failed to record download: ${e.message}")
+            }
         }
     }
 
