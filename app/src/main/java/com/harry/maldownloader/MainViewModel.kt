@@ -335,11 +335,9 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Anime")
         tags.add("MAL-${mal.id}")
         
-        // Enhanced content metadata
+        // Enhanced content metadata using correct field names
         mal.media_type?.let { tags.add("Type: $it") }
         mal.status?.let { tags.add("Status: $it") }
-        mal.rating?.let { tags.add("Rating: $it") }
-        mal.source?.let { tags.add("Source: $it") }
         mal.num_episodes?.let { if (it > 0) tags.add("Episodes: $it") }
         
         // Season and year information
@@ -364,10 +362,9 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             }
         }
         
-        // Enhanced NSFW detection with multiple criteria
+        // Enhanced NSFW detection with available criteria
         val isHentai = (mal.nsfw ?: "").contains("hentai", true) || 
-                      mal.genres?.any { it.name?.contains("hentai", true) == true } ?: false ||
-                      mal.rating?.contains("rx", true) ?: false
+                      mal.genres?.any { it.name?.contains("hentai", true) == true } ?: false
                       
         if (isHentai) {
             tags.add("Adult Content")
@@ -377,8 +374,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         
         return entry.copy(
             title = mal.title ?: entry.title,
-            englishTitle = mal.alternative_titles?.en,
-            japaneseTitle = mal.alternative_titles?.ja,
             synopsis = mal.synopsis,
             score = mal.mean?.toFloat(),
             status = mal.status,
@@ -399,22 +394,13 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         
         mal.media_type?.let { tags.add("Type: $it") }
         mal.status?.let { tags.add("Status: $it") }
-        mal.num_chapters?.let { if (it > 0) tags.add("Chapters: $it") }
-        mal.num_volumes?.let { if (it > 0) tags.add("Volumes: $it") }
+        mal.chapters?.let { if (it > 0) tags.add("Chapters: $it") }
+        mal.volumes?.let { if (it > 0) tags.add("Volumes: $it") }
         
         mal.genres?.forEach { genre ->
             genre.name?.let { genreName ->
                 tags.add(genreName)
                 mangaCustomTags.add(genreName)
-            }
-        }
-        
-        // Author information
-        mal.authors?.forEach { author ->
-            author.node?.first_name?.let { firstName ->
-                author.node.last_name?.let { lastName ->
-                    tags.add("Author: $firstName $lastName")
-                }
             }
         }
         
@@ -429,13 +415,11 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         
         return entry.copy(
             title = mal.title ?: entry.title,
-            englishTitle = mal.alternative_titles?.en,
-            japaneseTitle = mal.alternative_titles?.ja,
             synopsis = mal.synopsis,
             score = mal.mean?.toFloat(),
             status = mal.status,
-            chapters = mal.num_chapters,
-            volumes = mal.num_volumes,
+            chapters = mal.chapters,
+            volumes = mal.volumes,
             imageUrl = mal.main_picture?.large ?: mal.main_picture?.medium,
             allTags = tags.sorted(),
             genres = mal.genres?.mapNotNull { it.name } ?: emptyList(),
@@ -451,7 +435,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Anime")
         tags.add("MAL-${data.mal_id}")
         
-        // Comprehensive Jikan data extraction
+        // Comprehensive Jikan data extraction using correct field names
         data.type?.let { tags.add("Type: $it") }
         data.status?.let { tags.add("Status: $it") }
         data.rating?.let { tags.add("Rating: $it") }
@@ -459,7 +443,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         data.season?.let { tags.add("Season: ${it.replaceFirstChar { char -> char.uppercase() }}") }
         data.year?.let { tags.add("Year: $it") }
         data.episodes?.let { if (it > 0) tags.add("Episodes: $it") }
-        data.duration?.let { tags.add("Duration: $it") }
         
         // Enhanced genre and content categorization
         data.genres?.forEach { genre -> 
@@ -802,7 +785,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     
     private fun buildEnhancedXmpMetadata(entry: AnimeEntry): String {
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
-        val keywords = entry.allTags.joinToString(";")
         
         return """
             <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -846,16 +828,19 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private fun recordDownload(entry: AnimeEntry, url: String, path: String?, status: String, error: String? = null) {
         viewModelScope.launch {
             try {
+                // Use correct DownloadItem parameter names from your data class
                 val downloadItem = DownloadItem(
-                    id = 0, // Auto-generate
-                    entryId = entry.id,
+                    id = UUID.randomUUID().toString(), // String ID as per your DownloadItem class
                     url = url,
-                    localPath = path,
-                    filename = path?.let { File(it).name },
+                    fileName = path?.let { File(it).name } ?: "unknown.jpg",
+                    malId = entry.malId.toString(),
+                    title = entry.title,
+                    imageType = entry.type,
                     status = status,
+                    progress = if (status == "completed") 100 else 0,
+                    errorMessage = error,
                     createdAt = System.currentTimeMillis(),
-                    completedAt = if (status == "completed") System.currentTimeMillis() else null,
-                    error = error
+                    completedAt = if (status == "completed") System.currentTimeMillis() else null
                 )
                 
                 val currentDownloads = _downloads.value.toMutableList()
