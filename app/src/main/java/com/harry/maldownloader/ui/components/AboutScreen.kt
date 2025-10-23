@@ -26,7 +26,6 @@ fun AboutScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Icon and Title
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -37,156 +36,76 @@ fun AboutScreen(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "📱",
-                    style = MaterialTheme.typography.headlineLarge
-                )
+                Text("📱", style = MaterialTheme.typography.headlineLarge)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "MAL Downloader Enhanced",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Version ${BuildConfig.APP_VERSION}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Professional MyAnimeList Image Downloader",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("MAL Downloader Enhanced", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("Version ${BuildConfig.APP_VERSION}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Professional MyAnimeList Image Downloader", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Features Section
+
+        Spacer(Modifier.height(24.dp))
+
+        // Moved full feature list here from Import tab
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "✨ Enhanced Features",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
+                Text("✨ Enhanced Features v${BuildConfig.APP_VERSION}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
                 val features = listOf(
-                    "📁 Public Pictures directory storage",
-                    "🏷️ 25+ Dynamic metadata tags", 
-                    "🔍 Advanced search & filtering",
-                    "⚡ Concurrent download engine",
-                    "🎨 Material Design 3 interface",
-                    "📋 Comprehensive logging system",
-                    "🔧 Professional settings management",
-                    "📊 Real-time statistics",
-                    "🔄 Robust retry & recovery logic",
-                    "🎯 Working action buttons"
+                    "✅ Public Pictures directory storage (gallery visible)",
+                    "✅ 25+ Dynamic tags from dual MAL+Jikan API integration",
+                    "✅ XMP metadata embedding (AVES Gallery compatible)",
+                    "✅ Enhanced search, filter & sort functionality",
+                    "✅ Working action buttons with context menus",
+                    "✅ Adult content auto-detection & separation",
+                    "✅ Real-time progress with comprehensive logging",
+                    "✅ Professional error handling & recovery",
+                    "✅ Custom tag management",
+                    "✅ Custom tags file import support (XML format)"
                 )
-                
-                features.forEach { feature ->
-                    Text(
-                        text = feature,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-                }
+                features.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp)) }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Build Info
+
+        Spacer(Modifier.height(16.dp))
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "🛠️ Technical Details",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
+                Text("🛠️ Technical Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
                 val buildInfo = listOf(
                     "Build Type: ${BuildConfig.BUILD_TYPE}",
-                    "Version Code: ${BuildConfig.VERSION_CODE}", 
+                    "Version Code: ${BuildConfig.VERSION_CODE}",
                     "Application ID: ${BuildConfig.APPLICATION_ID}",
                     "Enhanced Edition with 6 functional tabs",
                     "Jetpack Compose + Material Design 3",
                     "MVVM Architecture with StateFlow",
                     "Room Database + Coroutines"
                 )
-                
-                buildInfo.forEach { info ->
-                    Text(
-                        text = info,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 1.dp)
-                    )
-                }
+                buildInfo.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 1.dp)) }
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Contact & Support
+
+        Spacer(Modifier.height(16.dp))
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "📧 Support & Contact",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Email: myaninelistapk@gmail.com",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Text(
-                    text = "GitHub: Harry4004/MAL-DOWNLOADER-APK",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "For bug reports, feature requests, and technical support.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("📧 Support & Contact", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text("Email: myaninelistapk@gmail.com", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text("GitHub: Harry4004/MAL-DOWNLOADER-APK", style = MaterialTheme.typrophy.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(8.dp))
+                Text("For bug reports, feature requests, and technical support.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Action Button
-        Button(
-            onClick = {
-                viewModel.log("📊 About screen viewed - MAL Downloader v${BuildConfig.APP_VERSION}")
-                if (onDismiss != {}) onDismiss()
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Default.Check, null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Got it")
+
+        Spacer(Modifier.height(24.dp))
+
+        Button(onClick = { viewModel.log("📊 About screen viewed - MAL Downloader v${BuildConfig.APP_VERSION}"); if (onDismiss != {}) onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Check, null); Spacer(Modifier.width(8.dp)); Text("Got it")
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Credits
-        Text(
-            text = "Made with ❤️ for the anime and manga community",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+
+        Spacer(Modifier.height(16.dp))
+        Text("Made with ❤️ for the anime and manga community", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
