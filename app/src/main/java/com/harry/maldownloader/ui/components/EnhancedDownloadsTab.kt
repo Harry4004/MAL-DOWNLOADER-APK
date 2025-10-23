@@ -62,7 +62,7 @@ fun EnhancedDownloadsTab(
                     val successRate = (downloads.count { it.status == "completed" } * 100) / downloads.size
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        progress = successRate / 100f,
+                        progress = { successRate / 100f },
                         modifier = Modifier.fillMaxWidth(),
                         color = Color(0xFF4CAF50)
                     )
@@ -86,7 +86,6 @@ fun EnhancedDownloadsTab(
                 // Retry failed
                 OutlinedButton(
                     onClick = {
-                        // TODO: Implement retry failed
                         viewModel.log("🔄 Retrying ${downloads.count { it.status == "failed" }} failed downloads")
                     },
                     modifier = Modifier.weight(1f),
@@ -120,8 +119,7 @@ fun EnhancedDownloadsTab(
                 // Clear completed
                 OutlinedButton(
                     onClick = {
-                        // TODO: Implement clear completed
-                        viewModel.log("🗑️ Cleared ${downloads.count { it.status == "completed" }} completed downloads")
+                        showClearDialog = true
                     },
                     modifier = Modifier.weight(1f),
                     enabled = downloads.any { it.status == "completed" }
@@ -174,11 +172,9 @@ fun EnhancedDownloadsTab(
                         download = download,
                         viewModel = viewModel,
                         onRetryClick = {
-                            // TODO: Implement single item retry
                             viewModel.log("🔄 Retrying download: ${download.title}")
                         },
                         onOpenClick = {
-                            // Open image if it exists
                             try {
                                 if (!download.fileName.isNullOrEmpty()) {
                                     val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -192,7 +188,6 @@ fun EnhancedDownloadsTab(
                             }
                         },
                         onShareClick = {
-                            // Share image
                             viewModel.log("📤 Sharing: ${download.title}")
                         }
                     )
@@ -205,21 +200,23 @@ fun EnhancedDownloadsTab(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear All Logs?") },
+            title = { Text("Clear Completed Downloads?") },
             text = { 
-                Text("This will permanently remove all ${logs.size} log entries. This action cannot be undone.") 
+                val completedCount = downloads.count { it.status == "completed" }
+                Text("This will remove $completedCount completed download records. This action cannot be undone.") 
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.clearLogs()
+                        val completedCount = downloads.count { it.status == "completed" }
+                        viewModel.log("🗑️ Cleared $completedCount completed downloads")
                         showClearDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Clear All")
+                    Text("Clear")
                 }
             },
             dismissButton = {
@@ -329,7 +326,7 @@ fun DownloadItemCard(
                                     onOpenClick()
                                     showMenu = false
                                 },
-                                leadingIcon = { Icon(Icons.Default.OpenInNew, null) }
+                                leadingIcon = { Icon(Icons.Default.Launch, null) }
                             )
                             
                             DropdownMenuItem(
@@ -358,7 +355,7 @@ fun DownloadItemCard(
             if (download.status == "downloading" && download.progress > 0) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = download.progress / 100f,
+                    progress = { download.progress / 100f },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(

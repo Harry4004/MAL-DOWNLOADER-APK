@@ -18,6 +18,7 @@ import com.harry.maldownloader.data.AppSettings
 import com.harry.maldownloader.data.DownloadItem
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.utils.StorageManager
+import com.harry.maldownloader.utils.AppBuildInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,7 +92,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private val hentaiCustomTags = mutableSetOf<String>()
 
     init {
-        log("🚀 [v${BuildConfig.APP_VERSION}] MAL Downloader Enhanced - Pictures directory storage enabled")
+        log("🚀 [v${BuildConfig.VERSION_NAME}] MAL Downloader Enhanced - Pictures directory storage enabled")
         loadCustomTags()
         loadSettings()
         storageManager.cleanupTempFiles()
@@ -151,7 +152,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, logsText)
-                putExtra(Intent.EXTRA_SUBJECT, "MAL Downloader v${BuildConfig.APP_VERSION} Logs")
+                putExtra(Intent.EXTRA_SUBJECT, "MAL Downloader v${BuildConfig.VERSION_NAME} Logs")
             }
             context.startActivity(Intent.createChooser(intent, "Share Logs"))
             log("📤 Sharing ${_logs.value.size} log entries")
@@ -218,7 +219,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     suspend fun processMalFile(context: Context, uri: Uri) {
         _isProcessing.value = true
         try {
-            log("🚀 [v${BuildConfig.APP_VERSION}] Enhanced MAL processing started")
+            log("🚀 [v${BuildConfig.VERSION_NAME}] Enhanced MAL processing started")
             
             if (!storageManager.isExternalStorageWritable()) {
                 log("❌ External storage not available")
@@ -293,6 +294,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             if (resp.isSuccessful) {
                 when (entry.type) {
                     "anime" -> {
+                        @Suppress("UNCHECKED_CAST")
                         val animeResp = resp as retrofit2.Response<AnimeResponse>
                         animeResp.body()?.data?.let { 
                             log("✅ Jikan API enriched: ${entry.title}")
@@ -300,6 +302,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                         }
                     }
                     "manga" -> {
+                        @Suppress("UNCHECKED_CAST")
                         val mangaResp = resp as retrofit2.Response<MangaResponse>
                         mangaResp.body()?.data?.let { 
                             log("✅ Jikan API enriched: ${entry.title}")
@@ -488,7 +491,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
 
             val request = Request.Builder()
                 .url(imageUrl)
-                .addHeader("User-Agent", "MAL-Downloader-v${BuildConfig.APP_VERSION}")
+                .addHeader("User-Agent", "MAL-Downloader-v${BuildConfig.VERSION_NAME}")
                 .build()
             
             val response = downloadClient.newCall(request).execute()
@@ -532,7 +535,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             
             val exif = ExifInterface(file.absolutePath)
             exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, entry.title)
-            exif.setAttribute(ExifInterface.TAG_SOFTWARE, "MAL-Downloader-v${BuildConfig.APP_VERSION}")
+            exif.setAttribute(ExifInterface.TAG_SOFTWARE, "MAL-Downloader-v${BuildConfig.VERSION_NAME}")
             exif.setAttribute(ExifInterface.TAG_USER_COMMENT, "MAL ID: ${entry.malId}")
             exif.saveAttributes()
             
@@ -575,7 +578,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     }
 
     fun log(message: String) {
-        if (BuildConfig.ENABLE_LOGGING) {
+        if (AppBuildInfo.ENABLE_LOGGING) {
             Log.d("MAL-Enhanced", message)
         }
         

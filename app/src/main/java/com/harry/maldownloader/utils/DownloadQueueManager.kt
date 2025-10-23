@@ -8,7 +8,6 @@ import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
-import com.harry.maldownloader.BuildConfig
 import com.harry.maldownloader.data.AnimeEntry
 import com.harry.maldownloader.data.AppSettings
 import kotlinx.coroutines.*
@@ -114,7 +113,7 @@ class DownloadQueueManager(private val context: Context) {
     }
     
     private fun log(message: String) {
-        if (BuildConfig.ENABLE_LOGGING) Log.d("DownloadQueue", message)
+        if (AppBuildInfo.ENABLE_LOGGING) Log.d("DownloadQueue", message)
         onLogMessage?.invoke(message)
     }
     

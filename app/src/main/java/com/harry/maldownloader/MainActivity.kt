@@ -28,6 +28,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.*
 import com.harry.maldownloader.ui.theme.MaldownloaderTheme
+import com.harry.maldownloader.utils.AppBuildInfo
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -38,10 +39,32 @@ class MainActivity : ComponentActivity() {
     private val criticalError = mutableStateOf<Throwable?>(null)
     private val isInitialized = mutableStateOf(false)
 
+    // Modern permission handler using Activity Result API
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        try {
+            if (::viewModel.isInitialized) {
+                permissions.forEach { (permission, granted) ->
+                    when (permission) {
+                        Manifest.permission.POST_NOTIFICATIONS ->
+                            viewModel.setNotificationPermission(granted)
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_MEDIA_IMAGES ->
+                            viewModel.setStoragePermission(granted)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error handling permission result", e)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Log.d("MainActivity", "Starting MAL Downloader v${BuildConfig.APP_VERSION}")
+        Log.d("MainActivity", "Starting MAL Downloader v${BuildConfig.VERSION_NAME}")
 
         setContent {
             MaldownloaderTheme {
@@ -135,36 +158,10 @@ class MainActivity : ComponentActivity() {
             }
 
             if (permissions.isNotEmpty()) {
-                requestPermissions(permissions.toTypedArray(), 1001)
+                permissionLauncher.launch(permissions.toTypedArray())
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error checking permissions", e)
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        try {
-            if (requestCode == 1001 && ::viewModel.isInitialized) {
-                permissions.forEachIndexed { index, permission ->
-                    val granted = grantResults.getOrNull(index) == PackageManager.PERMISSION_GRANTED
-                    when (permission) {
-                        Manifest.permission.POST_NOTIFICATIONS ->
-                            viewModel.setNotificationPermission(granted)
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.READ_MEDIA_IMAGES ->
-                            viewModel.setStoragePermission(granted)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error handling permission result", e)
         }
     }
 }
@@ -186,7 +183,7 @@ fun LoadingScreen() {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "🚀 Initializing MAL Downloader v${BuildConfig.APP_VERSION}...",
+                    text = "🚀 Initializing MAL Downloader v${BuildConfig.VERSION_NAME}...",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -236,7 +233,7 @@ fun ErrorScreen(error: Throwable) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "App Version: v${BuildConfig.APP_VERSION}",
+                        text = "App Version: v${AppBuildInfo.APP_VERSION}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -293,7 +290,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                 title = {
                     Column {
                         Text(
-                            text = "MAL Downloader v${BuildConfig.APP_VERSION}",
+                            text = "MAL Downloader v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -411,7 +408,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
 
 @Composable
 fun SafeImportTab(
-    viewModel: MainViewModel,
+    @Suppress("UNUSED_PARAMETER") viewModel: MainViewModel,
     isProcessing: Boolean,
     onImportClick: () -> Unit,
     customTagsCount: Int
@@ -436,7 +433,7 @@ fun SafeImportTab(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Client ID: ${BuildConfig.MAL_CLIENT_ID.take(12)}...",
+                    text = "Client ID: ${AppBuildInfo.MAL_CLIENT_ID.take(12)}...",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
@@ -475,7 +472,7 @@ fun SafeImportTab(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "🚀 Enhanced Features v3.1",
+                    text = "🚀 Enhanced Features v${AppBuildInfo.APP_VERSION}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -509,7 +506,7 @@ fun SafeImportTab(
 
 @Composable
 fun SafeDownloadsTab(
-    viewModel: MainViewModel,
+    @Suppress("UNUSED_PARAMETER") viewModel: MainViewModel,
     downloads: List<com.harry.maldownloader.data.DownloadItem>
 ) {
     if (downloads.isEmpty()) {
