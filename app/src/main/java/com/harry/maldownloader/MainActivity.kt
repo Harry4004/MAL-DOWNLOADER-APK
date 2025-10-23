@@ -38,26 +38,44 @@ class MainActivity : ComponentActivity() {
 
     private val criticalError = mutableStateOf<Throwable?>(null)
     private val isInitialized = mutableStateOf(false)
+    private val permissionRequestInProgress = mutableStateOf(false)
 
-    // Modern permission handler using Activity Result API
+    // Enhanced permission handler with proper storage permission handling
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         try {
+            permissionRequestInProgress.value = false
             if (::viewModel.isInitialized) {
+                var storageGranted = false
+                var notificationGranted = false
+                
                 permissions.forEach { (permission, granted) ->
+                    Log.d("MainActivity", "Permission $permission: $granted")
                     when (permission) {
-                        Manifest.permission.POST_NOTIFICATIONS ->
-                            viewModel.setNotificationPermission(granted)
+                        Manifest.permission.POST_NOTIFICATIONS -> {
+                            notificationGranted = granted
+                        }
                         Manifest.permission.READ_EXTERNAL_STORAGE,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.READ_MEDIA_IMAGES ->
-                            viewModel.setStoragePermission(granted)
+                        Manifest.permission.READ_MEDIA_IMAGES -> {
+                            if (granted) storageGranted = true
+                        }
                     }
+                }
+                
+                viewModel.setNotificationPermission(notificationGranted)
+                viewModel.setStoragePermission(storageGranted)
+                
+                if (storageGranted) {
+                    viewModel.log("✅ Storage permissions granted - Ready for downloads")
+                } else {
+                    viewModel.log("⚠️ Storage permissions denied - Please grant storage access in Settings")
                 }
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error handling permission result", e)
+            permissionRequestInProgress.value = false
         }
     }
 
@@ -107,7 +125,7 @@ class MainActivity : ComponentActivity() {
                 MainViewModelFactory(repository)
             )[MainViewModel::class.java]
 
-            checkPermissions()
+            checkAndRequestPermissions()
             isInitialized.value = true
             Log.d("MainActivity", "Initialization completed successfully")
             
@@ -117,37 +135,67 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkPermissions() {
+    private fun checkAndRequestPermissions() {
         try {
-            val permissions = mutableListOf<String>()
-
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            if (permissionRequestInProgress.value) {
+                Log.d("MainActivity", "Permission request already in progress")
+                return
             }
+            
+            val permissions = mutableListOf<String>()
+            var hasAllStoragePermissions = false
 
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                if (ContextCompat.checkSelfPermission(
+            // Check storage permissions based on Android version
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                    // Android 13+ - Use READ_MEDIA_IMAGES
+                    if (ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.READ_MEDIA_IMAGES
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+                    } else {
+                        hasAllStoragePermissions = true
+                    }
+                }
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                    // Android 10-12 - Use READ_EXTERNAL_STORAGE
+                    if (ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    } else {
+                        hasAllStoragePermissions = true
+                    }
+                }
+                else -> {
+                    // Android 9 and below - Use both READ and WRITE
+                    val readGranted = ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.READ_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED
+                    
+                    val writeGranted = ContextCompat.checkSelfPermission(
                         this,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    ) == PackageManager.PERMISSION_GRANTED
+                    
+                    if (!readGranted) {
+                        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    }
+                    if (!writeGranted) {
+                        permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    }
+                    
+                    hasAllStoragePermissions = readGranted && writeGranted
                 }
             }
 
+            // Check notification permission for Android 13+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_MEDIA_IMAGES
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
-                }
-
                 if (ContextCompat.checkSelfPermission(
                         this,
                         Manifest.permission.POST_NOTIFICATIONS
@@ -157,20 +205,111 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Update ViewModel with current permission status
+            if (::viewModel.isInitialized) {
+                viewModel.setStoragePermission(hasAllStoragePermissions)
+                
+                val hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                    
+                viewModel.setNotificationPermission(hasNotificationPermission)
+            }
+
+            // Request missing permissions
             if (permissions.isNotEmpty()) {
+                Log.d("MainActivity", "Requesting permissions: ${permissions.joinToString(", ")}")
+                permissionRequestInProgress.value = true
                 permissionLauncher.launch(permissions.toTypedArray())
+            } else {
+                Log.d("MainActivity", "All permissions already granted")
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error checking permissions", e)
+            permissionRequestInProgress.value = false
         }
     }
 }
 
 @Composable
-fun LoadingScreen() { /* existing code unchanged */ }
+fun LoadingScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(64.dp),
+                strokeWidth = 6.dp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "🚀 Initializing MAL Downloader...",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Enhanced Edition v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 @Composable
-fun ErrorScreen(error: Throwable) { /* existing code unchanged */ }
+fun ErrorScreen(error: Throwable) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = "Error",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "❌ Critical Error",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = error.message ?: "Unknown error occurred",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Please restart the app",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,6 +323,8 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     val downloads by viewModel.downloads.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val customTags by viewModel.customTags.collectAsState()
+    val storagePermissionGranted by viewModel.storagePermissionGranted.collectAsState()
+    val notificationPermissionGranted by viewModel.notificationPermissionGranted.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
     var showDrawer by remember { mutableStateOf(false) }
@@ -192,7 +333,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     var showAbout by remember { mutableStateOf(false) }
     
     val tabs = listOf(
-        "🎥 Import",
+        "🍥 Import",
         "📂 Entries (${animeEntries.size})",
         "⬇️ Downloads (${downloads.size})",
         "📋 Logs (${logs.size})"
@@ -213,7 +354,6 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     ) { uri ->
         uri?.let {
             scope.launch {
-                // Explicitly call to avoid overload ambiguity
                 viewModel.processCustomTagsFile(activity, it)
             }
         }
@@ -245,6 +385,60 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Permission Status Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (storagePermissionGranted) 
+                                MaterialTheme.colorScheme.primaryContainer 
+                            else 
+                                MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = "📊 Permission Status",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (storagePermissionGranted) Icons.Default.CheckCircle else Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = if (storagePermissionGranted) Color.Green else Color.Red,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Storage: ${if (storagePermissionGranted) "Granted" else "Denied"}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (notificationPermissionGranted) Icons.Default.CheckCircle else Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = if (notificationPermissionGranted) Color.Green else Color.Red,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Notifications: ${if (notificationPermissionGranted) "Granted" else "Denied"}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     NavigationDrawerItem(
@@ -292,7 +486,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Enhanced Edition - Public Pictures Storage",
+                                text = "Enhanced Edition - Rich API Tags",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -331,7 +525,14 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
-                            text = { Text(text = title) }
+                            text = { 
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                                ) 
+                            },
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
                 }
@@ -339,7 +540,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
+                        .padding(12.dp)
                 ) {
                     when (selectedTab) {
                         0 -> EnhancedImportTab(
@@ -351,7 +552,8 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             onTagsImportClick = {
                                 tagsFilePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
                             },
-                            customTagsCount = customTags.size
+                            customTagsCount = customTags.size,
+                            storagePermissionGranted = storagePermissionGranted
                         )
                         1 -> EnhancedEntriesList(
                             viewModel = viewModel,

@@ -1,16 +1,36 @@
 package com.harry.maldownloader.utils
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Environment
 import android.util.Log
+import androidx.core.content.ContextCompat
 import java.io.*
 
 /**
- * Enhanced StorageManager with custom tags file support
+ * Enhanced StorageManager with proper permission checks and content folders
  */
 class StorageManager(private val context: Context) {
     
     private val malImagesDir = "MAL_Images"
+    
+    fun hasStoragePermission(): Boolean {
+        return try {
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                else ->
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     fun isExternalStorageWritable(): Boolean {
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
@@ -19,21 +39,21 @@ class StorageManager(private val context: Context) {
     fun fileExists(filename: String, contentType: String, isAdult: Boolean): Boolean {
         return try {
             val folder = getContentFolder(contentType, isAdult)
-            val file = File(folder, filename)
+            val file = java.io.File(folder, filename)
             file.exists()
         } catch (e: Exception) {
             false
         }
     }
     
-    private fun getContentFolder(type: String, isAdult: Boolean): File {
+    private fun getContentFolder(type: String, isAdult: Boolean): java.io.File {
         val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-        val malDir = File(picturesDir, malImagesDir)
+        val malDir = java.io.File(picturesDir, malImagesDir)
         
         val typeFolder = when {
-            isAdult -> File(malDir, "Adult")
-            type == "anime" -> File(malDir, "Anime")
-            type == "manga" -> File(malDir, "Manga")
+            isAdult -> java.io.File(malDir, "Adult")
+            type == "anime" -> java.io.File(malDir, "Anime")
+            type == "manga" -> java.io.File(malDir, "Manga")
             else -> malDir
         }
         
@@ -53,7 +73,7 @@ class StorageManager(private val context: Context) {
     ): String? {
         return try {
             val folder = getContentFolder(contentType, isAdult)
-            val file = File(folder, filename)
+            val file = java.io.File(folder, filename)
             
             file.outputStream().use { output ->
                 inputStream.copyTo(output)
@@ -72,7 +92,7 @@ class StorageManager(private val context: Context) {
     }
     
     /**
-     * NEW: Save sample tags file to Downloads directory
+     * Save sample tags file to Downloads directory
      */
     fun saveSampleFile(filename: String, content: String): String? {
         return try {
@@ -81,7 +101,7 @@ class StorageManager(private val context: Context) {
                 downloadsDir.mkdirs()
             }
             
-            val file = File(downloadsDir, filename)
+            val file = java.io.File(downloadsDir, filename)
             file.writeText(content, Charsets.UTF_8)
             
             if (file.exists()) {
@@ -98,7 +118,7 @@ class StorageManager(private val context: Context) {
     
     fun cleanupTempFiles() {
         try {
-            val tempDir = File(context.cacheDir, "temp_downloads")
+            val tempDir = java.io.File(context.cacheDir, "temp_downloads")
             if (tempDir.exists()) {
                 tempDir.deleteRecursively()
                 Log.d("StorageManager", "Temp files cleaned")
