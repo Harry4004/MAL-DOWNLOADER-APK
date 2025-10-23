@@ -1,9 +1,11 @@
 package com.harry.maldownloader
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.util.Log
 import android.util.Xml
 import androidx.exifinterface.media.ExifInterface
@@ -12,9 +14,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.harry.maldownloader.api.*
 import com.harry.maldownloader.data.AnimeEntry
+import com.harry.maldownloader.data.AppSettings
 import com.harry.maldownloader.data.DownloadItem
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.utils.StorageManager
+import com.harry.maldownloader.utils.DownloadQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +31,6 @@ import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
 import retrofit2.create
 import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -45,6 +48,11 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private val storageManager by lazy {
         StorageManager(repository.context)
     }
+    
+    // Advanced download queue manager
+    private val queueManager by lazy {
+        DownloadQueueManager(repository.context)
+    }
 
     // Enhanced HTTP client for robust image downloading
     private val downloadClient by lazy {
@@ -56,6 +64,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             .build()
     }
 
+    // Core state flows
     private val _notificationPermissionGranted = MutableStateFlow(false)
     val notificationPermissionGranted: StateFlow<Boolean> = _notificationPermissionGranted.asStateFlow()
 
@@ -79,6 +88,14 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
 
     private val _downloadProgress = MutableStateFlow<Map<Int, Float>>(emptyMap())
     val downloadProgress: StateFlow<Map<Int, Float>> = _downloadProgress.asStateFlow()
+    
+    // Enhanced settings management
+    private val _appSettings = MutableStateFlow(AppSettings())
+    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+    
+    // Queue management states
+    val queueState = queueManager.queueState
+    val activeDownloads = queueManager.activeDownloads
 
     // Enhanced tag collections
     private val animeCustomTags = mutableSetOf<String>()
@@ -88,8 +105,272 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     init {
         log("🚀 [v${BuildConfig.APP_VERSION}] MAL Downloader Enhanced - Pictures directory storage enabled")
         loadCustomTags()
-        // Cleanup any temp files from previous runs
+        loadSettings()
+        setupQueueManager()
         storageManager.cleanupTempFiles()
+    }
+    
+    private fun loadSettings() {
+        viewModelScope.launch {
+            try {
+                // TODO: Load from database
+                val settings = AppSettings() // Default settings for now
+                _appSettings.value = settings
+                log("🔧 Settings loaded: ${settings.maxConcurrentDownloads} concurrent downloads")
+            } catch (e: Exception) {
+                log("⚠️ Could not load settings: ${e.message}")
+            }
+        }
+    }
+    
+    private fun setupQueueManager() {
+        queueManager.configure(
+            settings = _appSettings.value,
+            onComplete = { entry, path, error ->
+                if (error != null) {
+                    log("❌ Download failed: ${entry.title} - $error")
+                } else {
+                    log("✅ Download completed: ${entry.title}")
+                }
+                recordDownload(entry, entry.imageUrl ?: "", path, if (error != null) "failed" else "completed", error)
+            },
+            onLog = { message ->
+                log(message)
+            }
+        )
+    }
+    
+    /**
+     * Enhanced settings management
+     */
+    fun updateSetting(key: String, value: Any) {
+        val current = _appSettings.value
+        val updated = when (key) {
+            "maxConcurrentDownloads" -> current.copy(maxConcurrentDownloads = value as Int)
+            "downloadOnlyOnWifi" -> current.copy(downloadOnlyOnWifi = value as Boolean)
+            "pauseOnLowBattery" -> current.copy(pauseOnLowBattery = value as Boolean)
+            "enableBackgroundDownloads" -> current.copy(enableBackgroundDownloads = value as Boolean)
+            "filenameFormat" -> current.copy(filenameFormat = value as String)
+            "separateAdultContent" -> current.copy(separateAdultContent = value as Boolean)
+            "embedXmpMetadata" -> current.copy(embedXmpMetadata = value as Boolean)
+            "preferMalOverJikan" -> current.copy(preferMalOverJikan = value as Boolean)
+            "apiDelayMs" -> current.copy(apiDelayMs = value as Long)
+            "enableDetailedLogs" -> current.copy(enableDetailedLogs = value as Boolean)
+            else -> current
+        }
+        
+        _appSettings.value = updated
+        
+        // Reconfigure queue manager with new settings
+        if (key in listOf("maxConcurrentDownloads", "downloadOnlyOnWifi", "pauseOnLowBattery")) {
+            setupQueueManager()
+        }
+        
+        log("⚙️ Setting updated: $key = $value")
+        
+        // TODO: Persist to database
+        viewModelScope.launch {
+            try {
+                // repository.saveSettings(updated)
+            } catch (e: Exception) {
+                log("⚠️ Could not save setting: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Enhanced queue management functions
+     */
+    fun startDownloadQueue() {
+        queueManager.startQueue()
+        log("🚀 Download queue started")
+    }
+    
+    fun pauseDownloadQueue() {
+        queueManager.pauseQueue()
+        log("⏸️ Download queue paused")
+    }
+    
+    fun stopDownloadQueue() {
+        queueManager.stopQueue()
+        log("🛑 Download queue stopped")
+    }
+    
+    fun retryFailedDownloads() {
+        val failedDownloads = _downloads.value.filter { it.status == "failed" }
+        val failedEntries = _animeEntries.value.filter { entry ->
+            failedDownloads.any { it.malId == entry.malId.toString() }
+        }
+        
+        if (failedEntries.isNotEmpty()) {
+            queueManager.addToQueue(failedEntries)
+            if (queueState.value == DownloadQueueManager.QueueState.IDLE) {
+                startDownloadQueue()
+            }
+            log("🔄 Added ${failedEntries.size} failed downloads back to queue")
+        }
+    }
+    
+    /**
+     * Enhanced clipboard and sharing functions
+     */
+    fun copyLogsToClipboard(context: Context) {
+        try {
+            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val logsText = _logs.value.joinToString("\n")
+            val clip = ClipData.newPlainText("MAL Downloader Logs", logsText)
+            clipboardManager.setPrimaryClip(clip)
+            log("📋 ${_logs.value.size} log entries copied to clipboard")
+        } catch (e: Exception) {
+            log("❌ Failed to copy logs: ${e.message}")
+        }
+    }
+    
+    fun shareLogsAsText(context: Context) {
+        try {
+            val logsText = _logs.value.joinToString("\n")
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, logsText)
+                putExtra(Intent.EXTRA_SUBJECT, "MAL Downloader v${BuildConfig.APP_VERSION} Logs")
+            }
+            context.startActivity(Intent.createChooser(intent, "Share Logs"))
+            log("📤 Sharing ${_logs.value.size} log entries")
+        } catch (e: Exception) {
+            log("❌ Failed to share logs: ${e.message}")
+        }
+    }
+    
+    /**
+     * Enhanced entry management functions
+     */
+    fun refreshEntryMetadata(entry: AnimeEntry) {
+        viewModelScope.launch {
+            try {
+                log("🔄 Refreshing metadata for: ${entry.title}")
+                val enriched = enrichWithBestAvailableApi(entry)
+                enriched?.let { newEntry ->
+                    val list = _animeEntries.value.toMutableList()
+                    val idx = list.indexOfFirst { it.malId == entry.malId }
+                    if (idx != -1) {
+                        list[idx] = newEntry
+                        _animeEntries.value = list
+                        log("✅ Metadata refreshed: ${newEntry.allTags.size} tags loaded")
+                    }
+                }
+            } catch (e: Exception) {
+                log("❌ Failed to refresh metadata: ${e.message}")
+            }
+        }
+    }
+    
+    fun openMalPage(context: Context, entry: AnimeEntry) {
+        try {
+            val malUrl = "https://myanimelist.net/${entry.type}/${entry.malId}"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(malUrl))
+            context.startActivity(intent)
+            log("🌐 Opening MAL page for: ${entry.title}")
+        } catch (e: Exception) {
+            log("❌ Could not open MAL page: ${e.message}")
+        }
+    }
+    
+    fun openJikanPage(context: Context, entry: AnimeEntry) {
+        try {
+            val jikanUrl = "https://jikan.moe/${entry.type}/${entry.malId}"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(jikanUrl))
+            context.startActivity(intent)
+            log("🌐 Opening Jikan page for: ${entry.title}")
+        } catch (e: Exception) {
+            log("❌ Could not open Jikan page: ${e.message}")
+        }
+    }
+    
+    /**
+     * Enhanced batch operations
+     */
+    fun downloadAllEntries() {
+        val downloadableEntries = _animeEntries.value.filter { 
+            !it.imageUrl.isNullOrEmpty() && it.imagePath.isNullOrEmpty()
+        }
+        
+        if (downloadableEntries.isNotEmpty()) {
+            queueManager.addToQueue(downloadableEntries)
+            startDownloadQueue()
+            log("📥 Added ${downloadableEntries.size} entries to download queue")
+        } else {
+            log("⚠️ No downloadable entries found")
+        }
+    }
+    
+    fun exportEntriesAsJson(context: Context) {
+        viewModelScope.launch {
+            try {
+                val entriesJson = _animeEntries.value.take(10).joinToString(",\n") { entry ->
+                    """
+                    {
+                        "malId": ${entry.malId},
+                        "title": "${entry.title}",
+                        "type": "${entry.type}",
+                        "score": ${entry.score ?: "null"},
+                        "tags": [${entry.allTags.joinToString(",") { "\"$it\"" }}],
+                        "synopsis": "${entry.synopsis?.take(100)?.replace("\"", "\\\"")}..."
+                    }
+                    """.trimIndent()
+                }
+                
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_TEXT, "[\n$entriesJson\n]")
+                    putExtra(Intent.EXTRA_SUBJECT, "MAL Entries Export (First 10)")
+                }
+                context.startActivity(Intent.createChooser(intent, "Export Entries"))
+                log("📤 Exported first 10 entries as JSON")
+            } catch (e: Exception) {
+                log("❌ Failed to export entries: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Enhanced statistics and diagnostics
+     */
+    fun generateDiagnosticReport(): String {
+        val settings = _appSettings.value
+        return buildString {
+            appendLine("📊 MAL Downloader v${BuildConfig.APP_VERSION} Diagnostic Report")
+            appendLine("Generated: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}")
+            appendLine()
+            appendLine("📂 Entries: ${_animeEntries.value.size}")
+            appendLine("⬇️ Downloads: ${_downloads.value.size}")
+            appendLine("📋 Log Entries: ${_logs.value.size}")
+            appendLine("🏷️ Custom Tags: ${_customTags.value.size}")
+            appendLine()
+            appendLine("🔧 Settings:")
+            appendLine("  Concurrent Downloads: ${settings.maxConcurrentDownloads}")
+            appendLine("  Wi-Fi Only: ${settings.downloadOnlyOnWifi}")
+            appendLine("  Pause on Low Battery: ${settings.pauseOnLowBattery}")
+            appendLine("  XMP Metadata: ${settings.embedXmpMetadata}")
+            appendLine("  Filename Format: ${settings.filenameFormat}")
+            appendLine()
+            appendLine("📱 System:")
+            appendLine("  Android Version: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            appendLine("  Build Type: ${if (BuildConfig.DEBUG) "Debug" else "Release"}")
+            appendLine("  Logging: ${if (BuildConfig.ENABLE_LOGGING) "Enabled" else "Disabled"}")
+            appendLine()
+            appendLine("📡 Storage:")
+            appendLine("  External Storage: ${if (storageManager.isExternalStorageWritable()) "Available" else "Unavailable"}")
+            appendLine("  Pictures Directory: ${storageManager.getDisplayPath("anime", false)}")
+            
+            val recentErrors = _logs.value.filter { it.contains("❌") || it.contains("💥") }.take(3)
+            if (recentErrors.isNotEmpty()) {
+                appendLine()
+                appendLine("❌ Recent Errors:")
+                recentErrors.forEach { error ->
+                    appendLine("  $error")
+                }
+            }
+        }
     }
 
     fun setNotificationPermission(granted: Boolean) { 
@@ -149,6 +430,18 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         _logs.value = emptyList()
         log("🧹 Logs cleared by user")
     }
+    
+    /**
+     * Enhanced log filtering
+     */
+    fun getFilteredLogs(filter: String): List<String> {
+        return when (filter.uppercase()) {
+            "ERROR" -> _logs.value.filter { it.contains("❌") || it.contains("💥") || it.contains("🚨") }
+            "WARN" -> _logs.value.filter { it.contains("⚠️") || it.contains("🔶") }
+            "INFO" -> _logs.value.filter { it.contains("✅") || it.contains("📊") || it.contains("🔍") || it.contains("🚀") }
+            else -> _logs.value
+        }
+    }
 
     suspend fun processMalFile(context: Context, uri: Uri) {
         _isProcessing.value = true
@@ -177,30 +470,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             
             if (entries.isEmpty()) {
                 log("❌ No entries found in XML file")
-                
-                // Enhanced diagnostics for empty results
-                try {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        val size = stream.available()
-                        if (size == 0) {
-                            log("❌ File is empty (0 bytes)")
-                        } else {
-                            log("📏 File size: ${size / 1024}KB - may not be valid MAL XML format")
-                            
-                            // Check first few characters for XML validity
-                            val buffer = ByteArray(100)
-                            val readBytes = stream.read(buffer)
-                            val preview = String(buffer, 0, readBytes)
-                            if (!preview.contains("<?xml")) {
-                                log("❌ File does not appear to be XML format")
-                            } else if (!preview.contains("myanimelist", true)) {
-                                log("❌ File may not be a MyAnimeList export")
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    log("❌ File access error: ${e.javaClass.simpleName} - ${e.message}")
-                }
+                performXmlDiagnostics(context, uri)
                 return
             }
             
@@ -238,7 +508,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                         }
                     }
                     
-                    delay(1200) // Rate limiting for API respect
+                    delay(_appSettings.value.apiDelayMs) // Configurable API delay
                 } catch (e: Exception) {
                     log("❌ Processing failed for ${entry.title}: ${e.message}")
                     failCount++
@@ -252,23 +522,60 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             log("💥 Critical error during MAL processing: ${e.message}")
         } finally { 
             _isProcessing.value = false 
-            _downloadProgress.value = emptyMap() // Clear progress indicators
+            _downloadProgress.value = emptyMap()
+        }
+    }
+    
+    private suspend fun performXmlDiagnostics(context: Context, uri: Uri) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val size = stream.available()
+                if (size == 0) {
+                    log("❌ File is empty (0 bytes)")
+                } else {
+                    log("📏 File size: ${size / 1024}KB - analyzing format...")
+                    
+                    val buffer = ByteArray(200)
+                    val readBytes = stream.read(buffer)
+                    val preview = String(buffer, 0, readBytes)
+                    
+                    when {
+                        !preview.contains("<?xml") -> log("❌ File does not appear to be XML format")
+                        !preview.contains("myanimelist", true) -> log("❌ File may not be a MyAnimeList export")
+                        !preview.contains("<anime>") && !preview.contains("<manga>") -> 
+                            log("❌ File does not contain anime or manga entries")
+                        else -> log("✅ XML format appears valid - may be corrupted or incomplete")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            log("❌ File diagnostic error: ${e.javaClass.simpleName} - ${e.message}")
         }
     }
 
     private suspend fun enrichWithBestAvailableApi(entry: AnimeEntry): AnimeEntry? = withContext(Dispatchers.IO) {
-        // Enhanced API integration with comprehensive error handling
+        val settings = _appSettings.value
         
-        // Try official MAL API first (premium quality data)
-        runCatching {
+        // Try APIs based on user preference
+        if (settings.preferMalOverJikan) {
+            // Try MAL first, then Jikan
+            tryMalApi(entry) ?: tryJikanApi(entry)
+        } else {
+            // Try Jikan first, then MAL
+            tryJikanApi(entry) ?: tryMalApi(entry)
+        }
+    }
+    
+    private suspend fun tryMalApi(entry: AnimeEntry): AnimeEntry? {
+        return runCatching {
             when (entry.type) {
                 "anime" -> malApi.getAnime(entry.malId)
                 "manga" -> malApi.getManga(entry.malId)
                 else -> null
             }
-        }.onSuccess { resp ->
-            if (resp != null && resp.isSuccessful) {
-                return@withContext when (entry.type) {
+        }.getOrNull()?.let { resp ->
+            if (resp.isSuccessful) {
+                when (entry.type) {
                     "anime" -> {
                         val animeResp = resp as retrofit2.Response<MalAnimeResponse>
                         animeResp.body()?.let { 
@@ -286,22 +593,22 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                     else -> null
                 }
             } else {
-                log("⚠️ MAL API returned ${resp?.code()} for ${entry.title}")
+                log("⚠️ MAL API returned ${resp.code()} for ${entry.title}")
+                null
             }
-        }.onFailure { e ->
-            log("⚠️ MAL API failed for ${entry.title}: ${e.message}, falling back to Jikan")
         }
-        
-        // Fallback to Jikan API (comprehensive free alternative)
-        runCatching {
+    }
+    
+    private suspend fun tryJikanApi(entry: AnimeEntry): AnimeEntry? {
+        return runCatching {
             when (entry.type) {
                 "anime" -> jikanApi.getAnimeFull(entry.malId)
                 "manga" -> jikanApi.getMangaFull(entry.malId)
                 else -> null
             }
-        }.onSuccess { resp ->
-            if (resp != null && resp.isSuccessful) {
-                return@withContext when (entry.type) {
+        }.getOrNull()?.let { resp ->
+            if (resp.isSuccessful) {
+                when (entry.type) {
                     "anime" -> {
                         val animeResp = resp as retrofit2.Response<AnimeResponse>
                         animeResp.body()?.data?.let { 
@@ -319,13 +626,10 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                     else -> null
                 }
             } else {
-                log("⚠️ Jikan API returned ${resp?.code()} for ${entry.title}")
+                log("⚠️ Jikan API returned ${resp.code()} for ${entry.title}")
+                null
             }
-        }.onFailure { e ->
-            log("❌ Both MAL and Jikan APIs failed for ${entry.title}: ${e.message}")
         }
-        
-        null // Return null if both APIs failed
     }
 
     private fun mapFromMalAnime(entry: AnimeEntry, mal: MalAnimeResponse): AnimeEntry {
@@ -350,19 +654,18 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         mal.genres?.forEach { genre ->
             genre.name?.let { genreName ->
                 tags.add(genreName)
-                // Add to appropriate custom tag collection for future use
                 animeCustomTags.add(genreName)
             }
         }
         
-        // Studio information (valuable for organization)
+        // Studio information
         mal.studios?.forEach { studio ->
             studio.name?.let { studioName ->
                 tags.add("Studio: $studioName")
             }
         }
         
-        // Enhanced NSFW detection with available criteria
+        // Enhanced NSFW detection
         val isHentai = (mal.nsfw ?: "").contains("hentai", true) || 
                       mal.genres?.any { it.name?.contains("hentai", true) == true } ?: false
                       
@@ -392,7 +695,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Manga")
         tags.add("MAL-${mal.id}")
         
-        // Using correct field names from MalMangaResponse
         mal.media_type?.let { tags.add("Type: $it") }
         mal.status?.let { tags.add("Status: $it") }
         mal.chapters?.let { if (it > 0) tags.add("Chapters: $it") }
@@ -432,11 +734,10 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private fun enrichAnimeEntry(entry: AnimeEntry, data: AnimeData): AnimeEntry {
         val tags = mutableSetOf<String>()
         
-        // Core tags
         tags.add("Anime")
         tags.add("MAL-${data.mal_id}")
         
-        // Comprehensive Jikan data extraction using correct field names from AnimeData
+        // Comprehensive Jikan data extraction
         data.type?.let { tags.add("Type: $it") }
         data.status?.let { tags.add("Status: $it") }
         data.rating?.let { tags.add("Rating: $it") }
@@ -476,7 +777,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             tags.add("Adult Content")
             tags.add("NSFW")
             tags.add("18+")
-            // Add relevant hentai subcategory tags
             tags.addAll(hentaiCustomTags.take(3))
         }
         
@@ -504,7 +804,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Manga")
         tags.add("MAL-${data.mal_id}")
         
-        // Using correct field names from MangaData
         data.type?.let { tags.add("Type: $it") }
         data.status?.let { tags.add("Status: $it") }
         data.chapters?.let { if (it > 0) tags.add("Chapters: $it") }
@@ -613,7 +912,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                                     ))
                                     entryCount++
                                     
-                                    // Progress feedback for large lists
                                     if (entryCount % 50 == 0) {
                                         log("📊 XML parsing progress: $entryCount entries processed...")
                                     }
@@ -631,10 +929,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Enhanced download function that saves images to public Pictures directory
-     * Visible in gallery apps and file managers
-     */
     suspend fun downloadToPublicPictures(entry: AnimeEntry): Boolean = withContext(Dispatchers.IO) {
         try {
             val imageUrl = entry.imageUrl
@@ -644,9 +938,8 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             }
 
             log("🌐 Downloading to Pictures directory: ${entry.title}")
-            log("🔗 Source URL: $imageUrl")
             
-            // Enhanced filename with metadata for better organization
+            val settings = _appSettings.value
             val sanitizedTitle = entry.title
                 .replace(Regex("[^a-zA-Z0-9._\\s-]"), "_")
                 .replace(Regex("\\s+"), "_")
@@ -656,23 +949,30 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                 imageUrl.contains(".jpg", true) || imageUrl.contains("jpeg", true) -> "jpg"
                 imageUrl.contains(".png", true) -> "png"
                 imageUrl.contains(".webp", true) -> "webp"
-                else -> "jpg" // Default to JPEG
+                else -> "jpg"
             }
             
-            val filename = "${entry.malId}_${sanitizedTitle}.$extension"
+            // Apply user's filename format preference
+            val filename = when (settings.filenameFormat) {
+                "{title}_{id}.{ext}" -> "${sanitizedTitle}_${entry.malId}.$extension"
+                "{id}_{title}.{ext}" -> "${entry.malId}_${sanitizedTitle}.$extension"
+                "{title}.{ext}" -> "${sanitizedTitle}.$extension"
+                else -> "${entry.malId}_${sanitizedTitle}.$extension"
+            }
             
-            // Check if file already exists to prevent duplicates
-            if (storageManager.fileExists(filename, entry.type, entry.isHentai)) {
-                log("✅ Image already exists in Pictures directory: $filename")
+            // Check for duplicates if enabled
+            if (settings.enableDuplicateDetection && 
+                storageManager.fileExists(filename, entry.type, entry.isHentai)) {
+                log("✅ Image already exists: $filename")
                 val displayPath = storageManager.getDisplayPath(entry.type, entry.isHentai) + filename
                 updateEntryWithPath(entry, displayPath)
                 recordDownload(entry, imageUrl, displayPath, "completed")
                 return@withContext true
             }
 
-            // Enhanced download with comprehensive retry logic
+            // Enhanced download with retry logic
             var attempts = 0
-            val maxAttempts = 3
+            val maxAttempts = settings.retryAttempts
             
             while (attempts < maxAttempts) {
                 try {
@@ -696,12 +996,11 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                     log("📦 Downloading ${entry.title}: ${contentLength / 1024}KB")
                     
                     response.body?.byteStream()?.use { inputStream ->
-                        // Use StorageManager to save to public Pictures directory
                         val savedPath = storageManager.saveImageToPublicDirectory(
                             inputStream = inputStream,
                             filename = filename,
                             contentType = entry.type,
-                            isAdult = entry.isHentai,
+                            isAdult = entry.isHentai && settings.separateAdultContent,
                             mimeType = when (extension) {
                                 "png" -> "image/png"
                                 "webp" -> "image/webp"
@@ -710,30 +1009,29 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                         )
                         
                         if (savedPath != null) {
-                            // Embed comprehensive XMP metadata
-                            embedEnhancedXmpMetadata(savedPath, entry)
+                            // Embed metadata if enabled
+                            if (settings.embedXmpMetadata) {
+                                embedEnhancedXmpMetadata(savedPath, entry)
+                            }
                             
                             val fileSizeKB = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                // For scoped storage, estimate from content length
                                 contentLength / 1024
                             } else {
-                                // For legacy storage, get actual file size
                                 File(savedPath).length() / 1024
                             }
                             
                             log("✅ Image saved to Pictures: ${File(savedPath).name} (${fileSizeKB}KB)")
-                            log("📏 Location: Pictures/MAL_Images/${entry.type.uppercase()}/${if (entry.isHentai) "Adult" else "General"}/")
+                            log("📏 Location: Pictures/MAL_Images/${entry.type.uppercase()}/${if (entry.isHentai && settings.separateAdultContent) "Adult" else "General"}/")
                             
                             updateEntryWithPath(entry, savedPath)
                             recordDownload(entry, imageUrl, savedPath, "completed")
                             return@withContext true
-                            
                         } else {
                             throw Exception("Failed to save to Pictures directory")
                         }
                     }
                     
-                    break // Success, exit retry loop
+                    break
                     
                 } catch (e: Exception) {
                     log("❌ Download attempt $attempts failed for ${entry.title}: ${e.message}")
@@ -742,13 +1040,12 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                         recordDownload(entry, imageUrl, null, "failed", e.message)
                         return@withContext false
                     } else {
-                        // Exponential backoff delay
                         delay(2000L * attempts)
                     }
                 }
             }
             
-            false // If we reach here, all attempts failed
+            false
         } catch (e: Exception) {
             log("💥 Critical download error for ${entry.title}: ${e.message}")
             recordDownload(entry, entry.imageUrl ?: "", null, "failed", e.message)
@@ -756,37 +1053,46 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }
     }
 
-    /**
-     * Enhanced XMP metadata embedding with comprehensive tag information
-     */
     private fun embedEnhancedXmpMetadata(filePath: String, entry: AnimeEntry) {
         try {
             val file = File(filePath)
             if (!file.exists()) return
             
             val exif = ExifInterface(file.absolutePath)
+            val settings = _appSettings.value
             
             // Basic EXIF metadata
-            exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, entry.synopsis ?: entry.title)
+            exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, 
+                if (settings.includeSynopsis && !entry.synopsis.isNullOrEmpty()) {
+                    entry.synopsis.take(settings.maxSynopsisLength)
+                } else {
+                    entry.title
+                }
+            )
             exif.setAttribute(ExifInterface.TAG_SOFTWARE, "MAL-Downloader-v${BuildConfig.APP_VERSION}")
             exif.setAttribute(ExifInterface.TAG_ARTIST, entry.studio ?: "Unknown Studio")
             exif.setAttribute(ExifInterface.TAG_COPYRIGHT, "MyAnimeList ID: ${entry.malId}")
-            exif.setAttribute(ExifInterface.TAG_USER_COMMENT, "Enhanced with 25+ dynamic tags")
+            exif.setAttribute(ExifInterface.TAG_USER_COMMENT, "Enhanced with ${entry.allTags.size} dynamic tags")
             
-            // Enhanced XMP metadata for AVES Gallery
-            val xmpData = buildEnhancedXmpMetadata(entry)
+            // Enhanced XMP metadata
+            val xmpData = buildEnhancedXmpMetadata(entry, settings)
             exif.setAttribute(ExifInterface.TAG_XMP, xmpData)
             
             exif.saveAttributes()
-            log("🏷️ Enhanced XMP metadata embedded: ${entry.allTags.size} tags for gallery compatibility")
+            log("🏷️ Enhanced XMP metadata embedded: ${entry.allTags.take(settings.maxTagsPerImage).size} tags")
             
         } catch (e: Exception) {
             log("⚠️ Metadata embedding failed for ${entry.title}: ${e.message}")
         }
     }
     
-    private fun buildEnhancedXmpMetadata(entry: AnimeEntry): String {
+    private fun buildEnhancedXmpMetadata(entry: AnimeEntry, settings: AppSettings): String {
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
+        val tagsToEmbed = if (settings.prioritizeUserTags && entry.userTags.isNotEmpty()) {
+            (entry.userTags + entry.allTags).distinct().take(settings.maxTagsPerImage)
+        } else {
+            entry.allTags.take(settings.maxTagsPerImage)
+        }
         
         return """
             <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -795,10 +1101,10 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                 xmlns:dc="http://purl.org/dc/elements/1.1/"
                 xmlns:xmp="http://ns.adobe.com/xap/1.0/">
                 <dc:title>${entry.title}</dc:title>
-                <dc:description>${entry.synopsis?.take(500) ?: "MAL ID: ${entry.malId}"}</dc:description>
+                <dc:description>${if (settings.includeSynopsis && !entry.synopsis.isNullOrEmpty()) entry.synopsis.take(settings.maxSynopsisLength) else "MAL ID: ${entry.malId}"}</dc:description>
                 <dc:subject>
                     <rdf:Bag>
-                        ${entry.allTags.take(50).joinToString("") { "<rdf:li>$it</rdf:li>" }}
+                        ${tagsToEmbed.joinToString("") { "<rdf:li>$it</rdf:li>" }}
                     </rdf:Bag>
                 </dc:subject>
                 <dc:creator>${entry.studio ?: "MAL-Downloader-Enhanced"}</dc:creator>
@@ -830,9 +1136,8 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private fun recordDownload(entry: AnimeEntry, url: String, path: String?, status: String, error: String? = null) {
         viewModelScope.launch {
             try {
-                // Use correct DownloadItem parameter names matching your data class
                 val downloadItem = DownloadItem(
-                    id = UUID.randomUUID().toString(), // String ID as per your DownloadItem class
+                    id = UUID.randomUUID().toString(),
                     url = url,
                     fileName = path?.let { File(it).name } ?: "unknown.jpg",
                     malId = entry.malId.toString(),
@@ -849,7 +1154,6 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                 currentDownloads.add(downloadItem)
                 _downloads.value = currentDownloads
                 
-                // Log download record for tracking
                 if (BuildConfig.ENABLE_LOGGING) {
                     Log.d("MAL-Enhanced", "Download recorded: ${entry.title} -> $status")
                 }
@@ -859,44 +1163,45 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         }
     }
 
-    // Main download entry point (preserved from original interface)
     suspend fun downloadImages(entry: AnimeEntry) {
         downloadToPublicPictures(entry)
     }
 
     /**
-     * Enhanced logging with timestamp and conditional Android logging
+     * Enhanced logging with filtering and management
      */
     fun log(message: String) {
-        // Android system logging (debug builds only)
         if (BuildConfig.ENABLE_LOGGING) {
             Log.d("MAL-Enhanced", message)
         }
         
-        // UI logging for user feedback
         viewModelScope.launch {
             try {
                 val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
                 val logEntry = "[$timestamp] $message"
                 val current = _logs.value.toMutableList()
                 current.add(0, logEntry)
-                _logs.value = current.take(500) // Keep last 500 entries for performance
+                val maxLogs = _appSettings.value.logRetentionCount
+                _logs.value = current.take(maxLogs)
                 
-                // Persist to database (optional, with error handling)
                 try {
                     repository.logInfo("app", logEntry)
                 } catch (e: Exception) {
-                    // Silently ignore database logging errors to prevent crashes
                     if (BuildConfig.ENABLE_LOGGING) {
-                        Log.w("MAL-Enhanced", "Failed to persist log to database: ${e.message}")
+                        Log.w("MAL-Enhanced", "Failed to persist log: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
-                // Ultimate fallback - even logging shouldn't crash the app
                 if (BuildConfig.ENABLE_LOGGING) {
                     Log.e("MAL-Enhanced", "Critical logging error: ${e.message}")
                 }
             }
         }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        queueManager.cleanup()
+        log("🧹 MainViewModel cleaned up")
     }
 }
