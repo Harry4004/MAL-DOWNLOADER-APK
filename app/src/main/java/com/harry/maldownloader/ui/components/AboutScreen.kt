@@ -93,7 +93,7 @@ fun AboutScreen(
                 Text("📧 Support & Contact", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text("Email: myaninelistapk@gmail.com", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                Text("GitHub: Harry4004/MAL-DOWNLOADER-APK", style = MaterialTheme.typrophy.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text("GitHub: Harry4004/MAL-DOWNLOADER-APK", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(8.dp))
                 Text("For bug reports, feature requests, and technical support.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
