@@ -1,7 +1,9 @@
 package com.harry.maldownloader.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,9 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.harry.maldownloader.BuildConfig
 import com.harry.maldownloader.MainViewModel
 import com.harry.maldownloader.utils.AppBuildInfo
 
@@ -20,17 +23,20 @@ fun EnhancedImportTab(
     viewModel: MainViewModel,
     isProcessing: Boolean,
     onMalImportClick: () -> Unit,
-    onTagsImportClick: () -> Unit,
+    onTagsImportClick: () -> Unit, // kept for file picker route
     customTagsCount: Int,
     storagePermissionGranted: Boolean
 ) {
+    var showAddTagsDialog by remember { mutableStateOf(false) }
+    var manualTagsText by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Status card - preserve existing functionality
+        // Status card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -63,7 +69,7 @@ fun EnhancedImportTab(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Main MAL XML import button - preserve existing functionality
+        // Main MAL XML import button
         Button(
             onClick = onMalImportClick,
             modifier = Modifier
@@ -90,25 +96,25 @@ fun EnhancedImportTab(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // NEW: Custom Tags Import Button
-        OutlinedButton(
-            onClick = onTagsImportClick,
+        // REPLACED: Old orange box -> New glassy Add Custom Tags button
+        ElevatedButton(
+            onClick = { showAddTagsDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
-            enabled = !isProcessing
+            shape = RoundedCornerShape(16.dp)
         ) {
             Icon(Icons.Default.Label, null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "🏷️ Import Custom Tags File",
+                text = "➕ Add Custom Tags",
                 style = MaterialTheme.typography.titleSmall
             )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // NEW: Information card about custom tags file format
+        // Info card about custom tags
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -117,34 +123,16 @@ fun EnhancedImportTab(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "📝 Custom Tags File Format",
+                    text = "📝 Custom Tags",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "• Format: XML file (.xml)",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "• Structure: <tags><tag>ActionRPG</tag><tag>Favorite</tag></tags>",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "• Use: Organize your collection with personal tags",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "• Compatible: Works with existing XML parser (minimal code changes)",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                
+                Text("• Write your own tags or import from XML", style = MaterialTheme.typography.bodySmall)
+                Text("• XML Structure: <tags><tag>ActionRPG</tag><tag>Favorite</tag></tags>", style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                
                 OutlinedButton(
-                    onClick = {
-                        viewModel.generateSampleTagsFile()
-                    },
+                    onClick = { viewModel.generateSampleTagsFile() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
@@ -156,7 +144,7 @@ fun EnhancedImportTab(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Preserve existing features card
+        // Features card
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -164,10 +152,8 @@ fun EnhancedImportTab(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
-
-                val features = listOf(
+                listOf(
                     "✅ Public Pictures directory storage (gallery visible)",
                     "✅ 25+ Dynamic tags from dual MAL+Jikan API integration",
                     "✅ XMP metadata embedding (AVES Gallery compatible)",
@@ -177,49 +163,89 @@ fun EnhancedImportTab(
                     "✅ Real-time progress with comprehensive logging",
                     "✅ Professional error handling & recovery",
                     "✅ Custom tag management ($customTagsCount tags loaded)",
-                    "✅ NEW: Custom tags file import support (XML format)"
-                )
+                    "✅ NEW: Manual write + XML import for custom tags"
+                ).forEach { feature ->
+                    Text(feature, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 1.dp))
+                }
+            }
+        }
+    }
 
-                features.forEach { feature ->
-                    Text(
-                        text = feature,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 1.dp)
-                    )
-                }
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Processing status indicator
-        if (isProcessing) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+    // Apple-style transparent dialog for Add Custom Tags
+    if (showAddTagsDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddTagsDialog = false },
+            confirmButton = {},
+            dismissButton = {},
+            title = null,
+            text = {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "🔄 Processing in progress...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "Enriching entries with dual-API tags & downloading images",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(
+                        modifier = Modifier
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.14f),
+                                        Color.White.copy(alpha = 0.10f)
+                                    )
+                                )
+                            )
+                            .padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Add Custom Tags",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+
+                        // Option 1: Write Custom Tags
+                        ElevatedButton(
+                            onClick = { /* open inline field: toggle a second stage */ showAddTagsDialog = false; viewModel.openManualTagsInput() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Write Custom Tags", color = Color.White)
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Option 2: Import Custom Tags File (reuse existing picker)
+                        OutlinedButton(
+                            onClick = { showAddTagsDialog = false; onTagsImportClick() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.FileOpen, null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Import Custom Tags File", color = Color.White)
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            "Tip: You can paste tags separated by commas or new lines.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+
+                        Spacer(Modifier.height(6.dp))
+
+                        TextButton(onClick = { showAddTagsDialog = false }) {
+                            Text("Close", color = Color.White)
+                        }
+                    }
                 }
             }
-        }
+        )
     }
 }
