@@ -1,9 +1,12 @@
 package com.harry.maldownloader.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,12 +17,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.harry.maldownloader.MainViewModel
 import com.harry.maldownloader.utils.AppBuildInfo
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun EnhancedImportTab(
@@ -28,39 +36,40 @@ fun EnhancedImportTab(
     onMalImportClick: () -> Unit,
     onTagsImportClick: () -> Unit,
     customTagsCount: Int,
-    storagePermissionGranted: Boolean
+    storagePermissionGranted: Boolean,
+    onMenuSwipe: () -> Unit = {} // call this to open menu
 ) {
     var showAddTagsDialog by remember { mutableStateOf(false) }
     var showConfirmSampleDialog by remember { mutableStateOf(false) }
     var showSampleSavedBanner by remember { mutableStateOf<String?>(null) }
+    var bannerOffsetPx by remember { mutableStateOf(0f) }
+    val bannerOffsetDp: Dp by animateDpAsState(targetValue = bannerOffsetPx.dp, animationSpec = tween(250), label = "Banner offset animation")
+
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(showSampleSavedBanner) {
+        if (showSampleSavedBanner != null) {
+            delay(3500)
+            if (showSampleSavedBanner != null && bannerOffsetPx == 0f) showSampleSavedBanner = null
+        }
+    }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Status card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("🎯 MAL Authentication & Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text("Client ID: ${AppBuildInfo.MAL_CLIENT_ID.take(12)}...", style = MaterialTheme.typography.bodyMedium)
                 Text(if (storagePermissionGranted) "✅ Storage permission granted - Ready for downloads" else "❌ Storage permission denied - Downloads will fail", style = MaterialTheme.typography.bodySmall)
                 Text("Ready for enhanced dual-API enrichment & Pictures directory storage", style = MaterialTheme.typography.bodySmall)
             }
         }
-
         Spacer(Modifier.height(24.dp))
-
-        // Main import
         Button(
             onClick = onMalImportClick,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -76,10 +85,7 @@ fun EnhancedImportTab(
                 Text("📄 Import MAL XML & Download Images with Metadata", style = MaterialTheme.typography.titleMedium)
             }
         }
-
         Spacer(Modifier.height(16.dp))
-
-        // New: Add Custom Tags (replaces old import-only button)
         ElevatedButton(
             onClick = { showAddTagsDialog = true },
             modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -89,10 +95,7 @@ fun EnhancedImportTab(
             Spacer(Modifier.width(8.dp))
             Text("➕ Add Custom Tags", style = MaterialTheme.typography.titleSmall)
         }
-
         Spacer(Modifier.height(12.dp))
-
-        // Info card trimmed (orange box content removed as requested)
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))) {
             Column(Modifier.padding(12.dp)) {
                 Text("📝 Custom Tags", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -107,23 +110,43 @@ fun EnhancedImportTab(
                 }
             }
         }
-
         Spacer(Modifier.height(16.dp))
-
-        // Sample saved banner (glassy line like screenshot)
-        showSampleSavedBanner?.let { msg ->
+        // Glassy sample saved banner with swipe-to-right & auto-hide logic
+        if (showSampleSavedBanner != null) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset(x = bannerOffsetDp)
+                    .pointerInput(showSampleSavedBanner) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { _, dragAmount ->
+                                // Only allow swipe right gesture
+                                if (dragAmount > 0) bannerOffsetPx += dragAmount
+                            },
+                            onDragEnd = {
+                                if (bannerOffsetPx > 85) {
+                                    showSampleSavedBanner = null
+                                    scope.launch { onMenuSwipe() }
+                                } else {
+                                    bannerOffsetPx = 0f
+                                }
+                            }
+                        )
+                    },
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Box(Modifier.background(Brush.horizontalGradient(listOf(Color(0xFFB388FF).copy(alpha=0.22f), Color(0xFF7C4DFF).copy(alpha=0.22f)))).padding(vertical = 8.dp, horizontal = 16.dp)) {
-                    Text(msg, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge)
+                Box(
+                    Modifier.background(
+                        Brush.horizontalGradient(
+                            listOf(Color(0xFFB388FF).copy(alpha = 0.22f), Color(0xFF7C4DFF).copy(alpha = 0.22f))
+                        )
+                    ).padding(vertical = 8.dp, horizontal = 16.dp),
+                ) {
+                    Text(showSampleSavedBanner!!, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
-
-        // Processing status (unchanged)
         if (isProcessing) {
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))) {
                 Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -135,8 +158,7 @@ fun EnhancedImportTab(
             }
         }
     }
-
-    // Glassy Add Tags dialog with swipe-to-close support
+    // Glassy Add Tags dialog with swipe-to-close
     if (showAddTagsDialog) {
         var dragOffset by remember { mutableStateOf(0f) }
         AlertDialog(
@@ -177,8 +199,6 @@ fun EnhancedImportTab(
             }
         )
     }
-
-    // Glassy confirmation before generating sample file + swipe-to-close
     if (showConfirmSampleDialog) {
         var dragOffset2 by remember { mutableStateOf(0f) }
         AlertDialog(
@@ -186,7 +206,7 @@ fun EnhancedImportTab(
             confirmButton = {
                 TextButton(onClick = {
                     showConfirmSampleDialog = false
-                    val path = viewModel.generateSampleTagsFile() // update VM to return a string path
+                    val path = viewModel.generateSampleTagsFile()
                     showSampleSavedBanner = "File saved in the Download folder"
                 }) { Text("Generate") }
             },
