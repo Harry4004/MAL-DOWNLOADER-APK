@@ -29,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.EntriesList
+import com.harry.maldownloader.ui.components.LogsPanel
 import com.harry.maldownloader.ui.components.TagManagerDialog
 import com.harry.maldownloader.ui.theme.MaldownloaderTheme
 import kotlinx.coroutines.launch
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Log.d("MainActivity", "Starting onCreate")
+        Log.d("MainActivity", "Starting MAL Downloader v${BuildConfig.APP_VERSION}")
 
         // Set content first to prevent black screen
         setContent {
@@ -70,7 +71,7 @@ class MainActivity : ComponentActivity() {
 
     private fun initializeApp() {
         try {
-            Log.d("MainActivity", "Initializing database")
+            Log.d("MainActivity", "Initializing database and repository")
             
             // Get database from Application with null safety
             val app = application as MainApplication
@@ -80,27 +81,25 @@ class MainActivity : ComponentActivity() {
                 throw Exception("Database initialization failed in MainApplication")
             }
 
-            Log.d("MainActivity", "Initializing repository")
             repository = DownloadRepository(
                 context = this,
                 database = database
             )
 
-            Log.d("MainActivity", "Creating ViewModel")
+            Log.d("MainActivity", "Creating ViewModel with enhanced features")
             viewModel = ViewModelProvider(
                 this,
                 MainViewModelFactory(repository)
             )[MainViewModel::class.java]
 
-            Log.d("MainActivity", "Checking permissions")
             checkPermissions()
 
             // Mark as initialized
             isInitialized.value = true
-            Log.d("MainActivity", "onCreate completed successfully")
+            Log.d("MainActivity", "Initialization completed successfully")
             
         } catch (e: Exception) {
-            Log.e("MainActivity", "Critical error in onCreate", e)
+            Log.e("MainActivity", "Critical error during initialization", e)
             criticalError.value = e
         }
     }
@@ -109,6 +108,7 @@ class MainActivity : ComponentActivity() {
         try {
             val permissions = mutableListOf<String>()
 
+            // Storage permissions for image saving
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_EXTERNAL_STORAGE
@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Android 13+ media permissions
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(
                         this,
@@ -197,13 +198,13 @@ fun LoadingScreen() {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "🚀 Initializing MAL Downloader v3.0...",
+                    text = "🚀 Initializing MAL Downloader v${BuildConfig.APP_VERSION}...",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Setting up database and features",
+                    text = "Enhanced with robust downloading & XMP metadata",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -245,6 +246,12 @@ fun ErrorScreen(error: Throwable) {
                         text = error.localizedMessage ?: "Unknown error",
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "App Version: v${BuildConfig.APP_VERSION}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -254,7 +261,7 @@ fun ErrorScreen(error: Throwable) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "• Restart the app\n• Clear app data\n• Reinstall if issue persists",
+                text = "• Restart the app\n• Clear app data and cache\n• Grant all requested permissions\n• Reinstall if issue persists",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -294,12 +301,12 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                 title = {
                     Column {
                         Text(
-                            text = "MAL Downloader v3.0",
+                            text = "MAL Downloader v${BuildConfig.APP_VERSION}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "25+ Dynamic Tags Edition",
+                            text = "Enhanced Download Engine & XMP Metadata",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -380,10 +387,12 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                         viewModel = viewModel,
                         downloads = downloads
                     )
-                    3 -> SafeLogsTab(
-                        viewModel = viewModel,
-                        logs = logs
-                    )
+                    3 -> {
+                        LogsPanel(
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -424,12 +433,12 @@ fun SafeImportTab(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Client ID: aaf018d4c098158...",
+                    text = "Client ID: ${BuildConfig.MAL_CLIENT_ID.take(12)}...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = "Ready for API enrichment",
+                    text = "Ready for enhanced API enrichment & download",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -450,10 +459,10 @@ fun SafeImportTab(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Processing with API enrichment...")
+                Text("Processing with enhanced API & download engine...")
             } else {
                 Text(
-                    text = "📄 Import MAL XML & Extract 25+ Tags",
+                    text = "📄 Import MAL XML & Download Images with Metadata",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -468,7 +477,7 @@ fun SafeImportTab(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "🚀 Features",
+                    text = "🚀 Enhanced Features v3.1",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -477,13 +486,15 @@ fun SafeImportTab(
 
                 val features = listOf(
                     "✅ 25+ Dynamic tags from MAL/Jikan API",
-                    "✅ Comprehensive XMP metadata embedding",
-                    "✅ AVES gallery compatibility",
-                    "✅ Organized folder structure",
+                    "✅ Robust image downloading with retry logic",
+                    "✅ XMP metadata embedding for gallery apps",
+                    "✅ AVES gallery full compatibility",
+                    "✅ Organized folder structure with tags",
                     "✅ Custom tag management ($customTagsCount tags)",
-                    "✅ Hentai content detection & tagging",
-                    "✅ Rate-limited API calls",
-                    "✅ Duplicate prevention"
+                    "✅ Hentai content detection & filtering",
+                    "✅ Rate-limited API calls with fallback",
+                    "✅ Duplicate prevention & resume support",
+                    "✅ Enhanced error reporting & diagnostics"
                 )
 
                 features.forEach { feature ->
@@ -558,6 +569,17 @@ fun SafeEntriesTab(
                         )
                         Text("Adult", style = MaterialTheme.typography.bodySmall)
                     }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val downloadedCount = entries.count { !it.imagePath.isNullOrEmpty() }
+                        Text(
+                            text = "$downloadedCount",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4CAF50)
+                        )
+                        Text("Downloaded", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
 
@@ -596,7 +618,7 @@ fun SafeDownloadsTab(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = "Import MAL entries and download them",
+                    text = "Import MAL entries and download them with enhanced engine",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -622,7 +644,7 @@ fun SafeDownloadsTab(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Download management UI will be enhanced in future updates",
+                text = "Enhanced download management with XMP metadata embedding and robust retry logic.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp)
             )
@@ -646,47 +668,7 @@ fun DownloadStat(label: String, value: String, color: Color) {
     }
 }
 
-@Composable
-fun SafeLogsTab(
-    viewModel: MainViewModel,
-    logs: List<String>
-) {
-    Column {
-        if (logs.isNotEmpty()) {
-            Button(
-                onClick = { viewModel.clearLogs() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Clear, "Clear")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Clear Logs (${logs.size})")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                logs.forEach { logEntry ->
-                    Text(
-                        text = logEntry,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                }
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No logs available", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-
-// MainViewModelFactory class definition
+// Enhanced MainViewModelFactory with error handling
 class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
