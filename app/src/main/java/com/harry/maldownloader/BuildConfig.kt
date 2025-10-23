@@ -18,6 +18,6 @@ object BuildConfig {
     const val MAL_CLIENT_ID = "your_mal_client_id_here"
     
     // Build information
-    const val BUILD_TIME = System.currentTimeMillis()
+    val BUILD_TIME = System.currentTimeMillis()
     const val BUILD_FLAVOR = "enhanced"
 }
