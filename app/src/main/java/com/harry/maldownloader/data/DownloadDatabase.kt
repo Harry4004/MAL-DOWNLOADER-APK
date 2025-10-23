@@ -8,8 +8,8 @@ import androidx.room.TypeConverters
 import android.util.Log
 
 @Database(
-    entities = [AnimeEntry::class, DownloadItem::class, DownloadLog::class, DuplicateHash::class],
-    version = 3, // Increment version to handle conflicts
+    entities = [AnimeEntry::class, DownloadItem::class, DownloadLog::class, DuplicateHash::class, AppSettings::class],
+    version = 4, // Increment for AppSettings table
     exportSchema = false
 )
 @TypeConverters(DownloadConverters::class)
@@ -18,6 +18,7 @@ abstract class DownloadDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
     abstract fun logDao(): DownloadLogDao
     abstract fun duplicateDao(): DuplicateDao
+    abstract fun settingsDao(): SettingsDao
 
     companion object {
         @Volatile
@@ -29,27 +30,27 @@ abstract class DownloadDatabase : RoomDatabase() {
                     val instance = Room.databaseBuilder(
                         context.applicationContext,
                         DownloadDatabase::class.java,
-                        "download_database"
+                        "download_database_v4_enhanced"
                     )
                         .fallbackToDestructiveMigration() // Handle version conflicts gracefully
-                        .allowMainThreadQueries() // Temporary fix for debugging
+                        .allowMainThreadQueries() // Temporary for settings access
                         .build()
                     
-                    Log.d("DownloadDatabase", "Database initialized successfully")
+                    Log.d("DownloadDatabase", "Enhanced database v4 initialized successfully with settings support")
                     INSTANCE = instance
                     instance
                 } catch (e: Exception) {
-                    Log.e("DownloadDatabase", "Failed to initialize database", e)
-                    throw e // Re-throw to be caught by MainApplication
+                    Log.e("DownloadDatabase", "Failed to initialize enhanced database", e)
+                    throw e
                 }
             }
         }
         
-        // Helper method to safely clear instance if needed
         fun clearInstance() {
             synchronized(this) {
                 INSTANCE?.close()
                 INSTANCE = null
+                Log.d("DownloadDatabase", "Database instance cleared")
             }
         }
     }
