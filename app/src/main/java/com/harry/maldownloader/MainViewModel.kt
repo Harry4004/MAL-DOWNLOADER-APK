@@ -335,7 +335,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Anime")
         tags.add("MAL-${mal.id}")
         
-        // Enhanced content metadata using correct field names
+        // Enhanced content metadata using correct field names from MalAnimeResponse
         mal.media_type?.let { tags.add("Type: $it") }
         mal.status?.let { tags.add("Status: $it") }
         mal.num_episodes?.let { if (it > 0) tags.add("Episodes: $it") }
@@ -392,6 +392,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Manga")
         tags.add("MAL-${mal.id}")
         
+        // Using correct field names from MalMangaResponse
         mal.media_type?.let { tags.add("Type: $it") }
         mal.status?.let { tags.add("Status: $it") }
         mal.chapters?.let { if (it > 0) tags.add("Chapters: $it") }
@@ -435,7 +436,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Anime")
         tags.add("MAL-${data.mal_id}")
         
-        // Comprehensive Jikan data extraction using correct field names
+        // Comprehensive Jikan data extraction using correct field names from AnimeData
         data.type?.let { tags.add("Type: $it") }
         data.status?.let { tags.add("Status: $it") }
         data.rating?.let { tags.add("Rating: $it") }
@@ -503,6 +504,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         tags.add("Manga")
         tags.add("MAL-${data.mal_id}")
         
+        // Using correct field names from MangaData
         data.type?.let { tags.add("Type: $it") }
         data.status?.let { tags.add("Status: $it") }
         data.chapters?.let { if (it > 0) tags.add("Chapters: $it") }
@@ -828,7 +830,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private fun recordDownload(entry: AnimeEntry, url: String, path: String?, status: String, error: String? = null) {
         viewModelScope.launch {
             try {
-                // Use correct DownloadItem parameter names from your data class
+                // Use correct DownloadItem parameter names matching your data class
                 val downloadItem = DownloadItem(
                     id = UUID.randomUUID().toString(), // String ID as per your DownloadItem class
                     url = url,
