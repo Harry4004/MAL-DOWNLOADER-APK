@@ -1,307 +1,294 @@
-# MAL Downloader APK v3.0 🚀
+# 📱 MAL Downloader v3.1 - Enhanced Edition
 
-A professional Android application that transforms MyAnimeList (MAL) XML exports into beautifully organized image collections with 25+ dynamic metadata tags and intelligent content management.
+> **Advanced MyAnimeList Image Downloader with XMP Metadata & 25+ Dynamic Tags**
 
-## ✨ Latest Features (v3.0)
+[![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com/)
+[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin-blue.svg)](https://kotlinlang.org)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-### 🎯 25+ Dynamic Metadata Tags
-- **Advanced API Integration**: Enhanced Jikan API enrichment
-- **Smart Content Detection**: Automatic hentai/adult content classification
-- **Dynamic Tag System**: 25+ metadata tags per entry including:
-  - Genres, Studios, Demographics, Themes
-  - Rating, Status, Episodes, Duration, Year
-  - Custom user tags with personalized management
-  - Content warnings and age ratings
+---
 
-### 🖥️ Enhanced User Experience
-- **Professional Loading Screen**: No more black screen issues
-- **Material3 Design**: Modern UI with smooth animations
-- **Real-time Progress Tracking**: Live updates during processing
-- **Error Recovery System**: Comprehensive error handling with troubleshooting
-- **Background Processing**: Non-blocking initialization
+## 🚀 **What is MAL Downloader?**
 
-### 🛡️ Reliability & Performance
-- **Database v3**: Enhanced Room database with migration support
-- **Crash Recovery**: Global exception handling with logging
-- **Memory Optimization**: Efficient processing for large collections
-- **Network Resilience**: Smart retry logic with exponential backoff
+MAL Downloader is a powerful Android application that automatically downloads high-quality images from your MyAnimeList (MAL) collection and enriches them with **comprehensive metadata** for seamless integration with gallery apps like **AVES Gallery**.
 
-## 🌟 Core Features
+### ✨ **Key Features**
 
-### Smart Organization System
-- **Intelligent Folder Structure**: Content-aware organization
-  ```
-  Pictures/MAL_Export/
-  ├── Anime/
-  │   ├── Action/ (Attack on Titan, etc.)
-  │   ├── Romance/ (Your Name, etc.)
-  │   └── Comedy/ (One Piece, etc.)
-  ├── Manga/
-  │   ├── Drama/ (Monster, etc.)
-  │   └── Thriller/ (Death Note, etc.)
-  └── Hentai/ (Age-appropriate organization)
-      ├── Anime/[Genres]/
-      └── Manga/[Genres]/
-  ```
+- 📥 **Robust Image Downloading** - Multi-source download with retry logic
+- 🏷️ **25+ Dynamic Tags** - Automatic tagging from MAL & Jikan APIs
+- 🎯 **XMP Metadata Embedding** - Full AVES Gallery compatibility
+- 🔐 **Official MAL API** - Premium data quality with Client ID authentication
+- 🌐 **Jikan API Fallback** - Comprehensive backup data source
+- 📁 **Smart Organization** - Auto-categorized folder structure (Anime/Manga/Adult)
+- 🎭 **NSFW Detection** - Automatic adult content identification and tagging
+- ⚡ **Rate Limited** - Respectful API usage with intelligent delays
+- 🔄 **Resume Support** - Skip already downloaded images
+- 📊 **Real-time Progress** - Live download status and comprehensive logging
 
-### Advanced Metadata System
-- **XMP Metadata Embedding**: Professional-grade metadata directly in images
-- **AVES Gallery Compatible**: Works seamlessly with photo management apps
-- **Rich Information**: Title, synopsis, score, status, episodes, year, genres
-- **Custom Tags**: Personalized tagging system (A-Action, R-Romance, etc.)
-- **Content Ratings**: Automatic adult content detection and labeling
+---
 
-### Modern Android Integration
-- **Android 14 Ready**: Full compatibility with latest Android versions
-- **Scoped Storage**: Proper modern storage handling
-- **Permission Management**: Smart permission requests for media access
-- **Notification System**: Progress notifications with download channels
+## 📱 **Screenshots**
 
-## 🚀 Getting Started
+### Main Interface
+- **Import Tab**: MAL XML file processing with API enrichment
+- **Entries Tab**: View parsed entries with statistics and tag counts
+- **Downloads Tab**: Monitor download progress and status
+- **Logs Tab**: Real-time processing logs with color-coded messages
 
-### Quick Setup
-1. **Export MAL Data**: MyAnimeList → Settings → Export → Download XML
-2. **Install App**: Download from GitHub releases or build from source
-3. **Grant Permissions**: Allow media access when prompted
-4. **Import & Process**: Select XML file and watch the magic happen!
+---
 
-### First Launch Experience
-- 🚀 Professional loading screen with initialization progress
-- ⚡ Background database setup (no blocking)
-- 🎯 Ready-to-use interface with all features available
-- 📱 Smooth Material3 animations throughout
+## 🛠️ **Technical Architecture**
 
-## 📱 User Interface
+### **Built With**
+- **🏗️ Architecture**: MVVM with Jetpack Compose
+- **🎨 UI Framework**: Material Design 3 + Jetpack Compose
+- **🌐 Networking**: Retrofit + OkHttp + Moshi JSON
+- **💾 Database**: Room with KSP code generation
+- **🔄 Async**: Kotlin Coroutines + StateFlow
+- **📁 Storage**: Scoped Storage + SAF (Storage Access Framework)
+- **🏷️ Metadata**: EXIF + XMP for gallery compatibility
 
-### Main Features Tabs
-1. **🎥 Import**: XML processing with API enrichment
-2. **📁 Entries**: Browse processed anime/manga with statistics
-3. **⬇️ Downloads**: Monitor active and completed downloads
-4. **📝 Logs**: Real-time processing logs with error tracking
+### **API Integration**
 
-### Smart Features
-- **Tag Manager**: Create and manage custom tags
-- **Progress Tracking**: Real-time status updates
-- **Error Recovery**: Detailed error messages with solutions
-- **Statistics Dashboard**: Collection insights and metrics
+#### **MyAnimeList Official API**
+- **Authentication**: OAuth 2.0 Client ID
+- **Endpoints**: `/anime/{id}` and `/manga/{id}`
+- **Data Quality**: Premium metadata with comprehensive details
+- **Rate Limits**: Respected with intelligent delays
 
-## 🔧 Technical Specifications
+#### **Jikan API (Unofficial)**
+- **Fallback Source**: When MAL API fails or is unavailable
+- **Endpoints**: `/anime/{id}/full` and `/manga/{id}/full`
+- **Data Richness**: Extended information including themes, demographics
+- **Free Access**: No authentication required
 
-### Architecture
-- **Language**: Kotlin 100% (modern Android development)
-- **UI Framework**: Jetpack Compose (Material3 Design)
-- **Architecture Pattern**: MVVM with Repository pattern
-- **Database**: Room 2.6.1 with migrations
-- **Async Processing**: Kotlin Coroutines with proper lifecycle management
+---
 
-### Core Dependencies
-```kotlin
-// Networking & API
-OkHttp 4.12.0 + Retrofit 2.9.0 + Moshi
-Jikan API integration with rate limiting
+## 📋 **Installation & Setup**
 
-// Database & Storage
-Room 2.6.1 with TypeConverters
-DataStore for preferences
-Scoped Storage compliance
+### **Prerequisites**
+- Android 7.0+ (API Level 24+)
+- Internet connection for API calls and image downloads
+- Storage permissions for saving images
+- MAL Client ID (optional but recommended for premium features)
 
-// UI & UX
-Jetpack Compose with Material3
-Coil for image loading
-Work Manager for background tasks
+### **Installation Steps**
 
-// Quality & Testing
-JUnit, Espresso, MockK
-Proguard optimization
-Crash reporting integration
+1. **Download APK**
+   ```bash
+   # From GitHub Releases
+   wget https://github.com/Harry4004/MAL-DOWNLOADER-APK/releases/latest/download/mal-downloader-v3.1.apk
+   
+   # Install via ADB
+   adb install mal-downloader-v3.1.apk
+   ```
+
+2. **Grant Permissions**
+   - Storage access for image saving
+   - Notification permissions for download status
+   - Document access for MAL XML import
+
+3. **Setup MAL Client ID** (Optional)
+   - Visit [MAL API Registration](https://myanimelist.net/apiconfig)
+   - Create a new application
+   - Add your Client ID to the app or build configuration
+
+---
+
+## 🎯 **How to Use**
+
+### **Step 1: Export Your MAL List**
+1. Go to [MyAnimeList.net](https://myanimelist.net)
+2. Navigate to your profile → Export Lists
+3. Download XML format for Anime and/or Manga lists
+
+### **Step 2: Import & Process**
+1. Open MAL Downloader app
+2. Go to **Import Tab**
+3. Tap "Import MAL XML & Download Images with Metadata"
+4. Select your exported XML file
+5. Watch real-time processing in **Logs Tab**
+
+### **Step 3: Monitor Downloads**
+1. Switch to **Downloads Tab** to see progress
+2. View detailed logs with timestamps
+3. Check **Entries Tab** for download statistics
+
+### **Step 4: Enjoy Enhanced Gallery**
+- Images saved to `/Android/data/com.harry.maldownloader/files/MAL_Images/`
+- Organized by type: `ANIME/General`, `MANGA/General`, `ANIME/Adult`
+- Full XMP metadata embedded for AVES Gallery
+- 25+ tags automatically applied
+
+---
+
+## 📊 **Folder Structure**
+
+```
+MAL_Images/
+├── ANIME/
+│   ├── General/
+│   │   ├── 12345_Attack_on_Titan.jpg
+│   │   └── 67890_Demon_Slayer.jpg
+│   └── Adult/
+│       └── 11111_Adult_Anime.jpg
+└── MANGA/
+    ├── General/
+    │   ├── 22222_One_Piece.jpg
+    │   └── 33333_Naruto.jpg
+    └── Adult/
+        └── 44444_Adult_Manga.jpg
 ```
 
-### Performance Features
-- **Memory Efficient**: Optimized bitmap processing
-- **Rate Limited**: Respects Jikan API constraints (1 req/sec)
-- **Background Processing**: Non-blocking UI operations
-- **Smart Caching**: Efficient data management
-- **Error Recovery**: Graceful failure handling
+---
 
-## 📋 System Requirements
+## 🏷️ **Dynamic Tagging System**
 
-### Minimum Requirements
-- **Android 7.0** (API 24) or higher
-- **RAM**: 2GB+ (4GB recommended for large collections)
-- **Storage**: Variable (depends on collection size)
-- **Network**: Stable internet for API enrichment
+### **Automatic Tags Generated**
+- **Basic**: Type (Anime/Manga), MAL ID, Status
+- **Content**: Genres, Themes, Demographics
+- **Production**: Studios, Producers, Authors
+- **Metadata**: Year, Season, Episodes/Chapters
+- **Content Rating**: Age ratings and NSFW detection
+- **Custom**: User-defined tags from XML + app management
 
-### Optimal Performance
-- **Android 12+** for best scoped storage experience
-- **4GB+ RAM** for processing 1000+ entries
-- **Fast internet** for quick API enrichment
-- **Modern device** for smooth animations
+### **Example Tag Set**
+```
+Anime, MAL-12345, TV, Completed, Action, Drama, Studio: Madhouse,
+Producer: Sony Pictures, Year: 2023, Season: Fall, Episodes: 24,
+Rating: R-17+, Shounen, User-Custom-Tag
+```
 
-### Required Permissions
-- `INTERNET`: Jikan API calls and image downloads
-- `READ_MEDIA_IMAGES`: Android 13+ media access
-- `POST_NOTIFICATIONS`: Download progress notifications
-- `READ_EXTERNAL_STORAGE`: Legacy Android versions
+---
 
-## 🏗️ Building from Source
+## 🔧 **Development Setup**
 
-### Prerequisites
-- **Android Studio**: Hedgehog (2023.1.1) or later
-- **JDK**: 17 or higher
-- **Android SDK**: 34 (Android 14)
-- **Gradle**: 8.0+ with Kotlin DSL
+### **Building from Source**
 
-### Build Commands
 ```bash
 # Clone repository
 git clone https://github.com/Harry4004/MAL-DOWNLOADER-APK.git
 cd MAL-DOWNLOADER-APK
 
-# Debug build
-./gradlew assembleDebug
+# Setup MAL Client ID (optional)
+echo "MAL_CLIENT_ID=your_client_id_here" > local.properties
 
-# Release build
-./gradlew assembleRelease
+# Build debug APK
+./gradlew :app:assembleDebug
 
-# Run tests
-./gradlew test
-
-# Find APKs
-ls app/build/outputs/apk/
+# Install to device
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### GitHub Actions CI/CD
-- ✅ Automated builds on every push
-- ✅ Quality checks and testing
-- ✅ Release artifact generation
-- ✅ Code scanning and security analysis
-
-## 🔄 Version History & Changelog
-
-### v3.0 (Current - October 2025)
-- 🚀 **Major UI Overhaul**: Complete Jetpack Compose migration
-- 🎯 **25+ Dynamic Tags**: Enhanced metadata system with custom tags
-- 🛡️ **Black Screen Fix**: Professional loading screen and error recovery
-- 📊 **Database v3**: Enhanced Room database with better migrations
-- 🔧 **Background Processing**: Non-blocking initialization and processing
-- 🎨 **Material3 Design**: Modern UI with smooth animations
-- 📱 **Android 14 Ready**: Full compatibility with latest Android
-- 🔔 **Notification Channels**: Enhanced download progress notifications
-- 🏷️ **Tag Management**: Advanced custom tag system
-- 📈 **Statistics**: Collection insights and download metrics
-
-### v2.0 (Legacy)
-- ✅ Modern Android practices implementation
-- ✅ Enhanced folder organization
-- ✅ Retry logic and error handling
-- ✅ XMP metadata embedding
-- ✅ Material3 theming
-
-### v1.0 (Original)
-- Basic XML parsing and downloading
-- Simple folder structure
-- Limited error handling
-
-## 🛠️ Troubleshooting
-
-### Common Issues & Solutions
-
-#### Black Screen on Startup
-- ✅ **Fixed in v3.0**: Now shows professional loading screen
-- 🔧 If issues persist: Clear app data and restart
-
-#### Permission Errors
-- 📱 Grant media permissions when prompted
-- ⚙️ Check Settings → Apps → MAL Downloader → Permissions
-
-#### API Rate Limiting
-- ⏱️ App automatically handles Jikan API limits
-- 🔄 Retry logic built-in for failed requests
-
-#### Database Issues
-- 🗄️ v3.0 includes automatic migration from older versions
-- 🔧 Fallback to destructive migration if needed
-
-## 🤝 Contributing
-
-### How to Contribute
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Follow** Kotlin coding standards and Material3 guidelines
-4. **Test** thoroughly on different Android versions
-5. **Submit** a pull request with detailed description
-
-### Development Guidelines
-- Use Kotlin coroutines for async operations
-- Follow MVVM architecture patterns
-- Implement proper error handling
-- Add comprehensive logging
-- Test on Android 7.0+ devices
-- Follow Material3 design principles
-
-### Code Quality
-- ✅ Kotlin coding conventions
-- ✅ Proper null safety
-- ✅ Comprehensive error handling
-- ✅ Memory leak prevention
-- ✅ Performance optimization
-
-## 📄 License & Legal
-
-### Usage Guidelines
-- ✅ **Personal Use**: Freely use for your own MAL collection
-- ⚠️ **API Respect**: Honor Jikan API rate limits and terms
-- 🔒 **Privacy**: All processing happens locally on your device
-- 📋 **Content**: Respect copyright and MyAnimeList terms of service
-
-### Data Privacy
-- 🔐 **Local Processing**: No data sent to external servers (except API calls)
-- 📱 **Device Storage**: All files stored locally on your device
-- 🛡️ **No Tracking**: No analytics or user tracking implemented
-- 🔓 **Open Source**: Full transparency with public source code
-
-## 🌟 Acknowledgments
-
-### Special Thanks
-- **MyAnimeList**: For the amazing platform and data export feature
-- **Jikan API**: For providing excellent MAL API access
-- **Android Team**: For modern development tools and libraries
-- **Community**: For feedback, bug reports, and feature suggestions
-
-### Technology Credits
-- **Jetpack Compose**: Modern Android UI toolkit
-- **Material3**: Beautiful design system
-- **Room Database**: Robust local storage
-- **Kotlin Coroutines**: Elegant async programming
-
-## 📞 Support & Community
-
-### Get Help
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/Harry4004/MAL-DOWNLOADER-APK/issues)
-- 💡 **Feature Requests**: GitHub Issues with enhancement label
-- 💬 **General Questions**: GitHub Discussions
-- 📚 **Documentation**: This README and code comments
-
-### Stay Updated
-- ⭐ **Star the repository** to show support
-- 👁️ **Watch** for notifications on new releases
-- 🍴 **Fork** to contribute or customize
+### **Development Requirements**
+- Android Studio Arctic Fox or newer
+- Kotlin 1.9.25+
+- Gradle 8.7+
+- JDK 17+
+- Android SDK API 34
 
 ---
 
-<div align="center">
+## 🐛 **Troubleshooting**
 
-**🎯 Developed with ❤️ by Harry4004**
+### **Common Issues**
 
-*Professional MAL collection management for Android*
+**❌ "No entries found" in logs**
+- Ensure XML file is valid MAL export (not HTML page)
+- Check file permissions and storage access
+- Verify XML format contains `<anime>` or `<manga>` elements
 
-**📅 Last Updated: October 22, 2025**
+**❌ "Download failed" errors**
+- Check internet connectivity
+- Verify storage permissions granted
+- Ensure sufficient storage space available
+- Some image URLs may be region-locked
 
-![GitHub stars](https://img.shields.io/github/stars/Harry4004/MAL-DOWNLOADER-APK?style=social)
-![GitHub forks](https://img.shields.io/github/forks/Harry4004/MAL-DOWNLOADER-APK?style=social)
-![GitHub issues](https://img.shields.io/github/issues/Harry4004/MAL-DOWNLOADER-APK)
-![Android](https://img.shields.io/badge/Android-7.0+-green)
-![Kotlin](https://img.shields.io/badge/Kotlin-100%-purple)
-![Material3](https://img.shields.io/badge/Material3-UI-blue)
+**❌ "API rate limit exceeded"**
+- App automatically handles rate limiting
+- MAL API: ~1000 requests/hour per Client ID
+- Jikan API: ~3 requests/second (handled automatically)
 
-</div>
+**❌ App crashes or black screen**
+- Clear app data and restart
+- Ensure all permissions are granted
+- Check Android version compatibility (7.0+)
+
+---
+
+## 📋 **Changelog**
+
+### **v3.1 - Enhanced Edition** (Current)
+- 🆕 **Robust Download Engine** with retry logic and progress tracking
+- 🆕 **XMP Metadata Embedding** for full AVES Gallery compatibility
+- 🆕 **Enhanced API Integration** with MAL official API + Jikan fallback
+- 🆕 **Smart Folder Organization** with Adult/General categorization
+- 🆕 **Real-time Logging** with timestamps and color coding
+- 🆕 **KSP Migration** from deprecated KAPT for future compatibility
+- 🆕 **Enhanced UI** with Material Design 3 and expanded log area
+- 🆕 **Error Diagnostics** with comprehensive error reporting
+
+### **v3.0 - Major Overhaul**
+- ✅ Complete Jetpack Compose UI
+- ✅ 25+ Dynamic metadata tags
+- ✅ Professional loading screens
+- ✅ Enhanced database with migrations
+- ✅ Background processing
+
+---
+
+## ⚖️ **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### **Third-Party Libraries**
+- **Retrofit** - Type-safe HTTP client
+- **Moshi** - Modern JSON library
+- **Room** - SQLite abstraction layer
+- **Compose** - Modern Android UI toolkit
+- **OkHttp** - Efficient HTTP client
+- **Coil** - Image loading for Kotlin
+
+---
+
+## 👨‍💻 **Author**
+
+**Harry4004** - [GitHub Profile](https://github.com/Harry4004)
+
+---
+
+## 🙏 **Acknowledgments**
+
+- **MyAnimeList** - For providing the comprehensive anime/manga database
+- **Jikan Team** - For maintaining the excellent unofficial MAL API
+- **AVES Gallery** - For inspiring enhanced metadata implementation
+- **Android Community** - For Jetpack Compose and modern development tools
+
+---
+
+## 📞 **Support**
+
+For support, feature requests, or bug reports:
+- 🐛 **Issues**: [GitHub Issues](https://github.com/Harry4004/MAL-DOWNLOADER-APK/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/Harry4004/MAL-DOWNLOADER-APK/discussions)
+- 📧 **Email**: harshitkhatriofficial@gmail.com
+
+---
+
+## 🔮 **Roadmap**
+
+### **Planned Features**
+- 🔄 **Background Sync** - Automatic list updates
+- 🎨 **Custom Themes** - Personalized UI themes
+- 📊 **Analytics Dashboard** - Collection insights and statistics
+- 🔍 **Advanced Search** - Filter and search downloaded content
+- 🌐 **Multi-language Support** - Internationalization
+- 📱 **Widget Support** - Home screen widgets
+- ☁️ **Cloud Backup** - Optional cloud synchronization
+
+---
+
+*Made with ❤️ for the anime and manga community*
+
+**⭐ Star this repo if you find it useful!**
