@@ -41,7 +41,7 @@ fun EnhancedLogsPanel(
     }
     
     Column(modifier = modifier) {
-        // Enhanced toolbar with filter chips
+        // Enhanced toolbar
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -60,7 +60,6 @@ fun EnhancedLogsPanel(
                     )
                     
                     Row {
-                        // Copy all logs
                         IconButton(
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -72,7 +71,6 @@ fun EnhancedLogsPanel(
                             Icon(Icons.Default.ContentCopy, "Copy All")
                         }
                         
-                        // Share logs
                         IconButton(
                             onClick = {
                                 val intent = Intent(Intent.ACTION_SEND).apply {
@@ -86,10 +84,7 @@ fun EnhancedLogsPanel(
                             Icon(Icons.Default.Share, "Share")
                         }
                         
-                        // Clear with confirmation
-                        IconButton(
-                            onClick = { showClearDialog = true }
-                        ) {
+                        IconButton(onClick = { showClearDialog = true }) {
                             Icon(Icons.Default.Delete, "Clear")
                         }
                     }
@@ -107,9 +102,9 @@ fun EnhancedLogsPanel(
                             onClick = { logFilter = filter },
                             label = {
                                 val count = when (filter) {
-                                    "ERROR" -> logs.count { it.contains("❌") || it.contains("💥") || it.contains("🚨") }
+                                    "ERROR" -> logs.count { it.contains("❌") || it.contains("💥") }
                                     "WARN" -> logs.count { it.contains("⚠️") || it.contains("🔶") }
-                                    "INFO" -> logs.count { it.contains("✅") || it.contains("📊") || it.contains("🔍") }
+                                    "INFO" -> logs.count { it.contains("✅") || it.contains("📊") }
                                     else -> logs.size
                                 }
                                 Text("$filter ($count)")
@@ -124,10 +119,7 @@ fun EnhancedLogsPanel(
         Card(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                .padding(top = 8.dp)
         ) {
             if (logs.isEmpty()) {
                 Box(
@@ -145,8 +137,7 @@ fun EnhancedLogsPanel(
                         )
                         Text(
                             text = "Import a MAL XML file to see processing logs",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
@@ -158,9 +149,9 @@ fun EnhancedLogsPanel(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val filteredLogs = when (logFilter) {
-                        "ERROR" -> logs.filter { it.contains("❌") || it.contains("💥") || it.contains("🚨") }
+                        "ERROR" -> logs.filter { it.contains("❌") || it.contains("💥") }
                         "WARN" -> logs.filter { it.contains("⚠️") || it.contains("🔶") }
-                        "INFO" -> logs.filter { it.contains("✅") || it.contains("📊") || it.contains("🔍") || it.contains("🚀") }
+                        "INFO" -> logs.filter { it.contains("✅") || it.contains("📊") }
                         else -> logs
                     }
                     
@@ -173,7 +164,7 @@ fun EnhancedLogsPanel(
                                         MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
                                     logEntry.contains("⚠️") -> 
                                         MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                                    logEntry.contains("✅") || logEntry.contains("🎉") -> 
+                                    logEntry.contains("✅") -> 
                                         Color(0xFF4CAF50).copy(alpha = 0.1f)
                                     else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 }

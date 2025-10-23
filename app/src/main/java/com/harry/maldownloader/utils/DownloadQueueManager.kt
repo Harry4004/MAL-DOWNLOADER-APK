@@ -15,6 +15,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Semaphore
 import java.util.concurrent.ConcurrentHashMap
+import java.util.*
 
 /**
  * Advanced download queue manager for MAL Downloader v3.1
@@ -22,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 class DownloadQueueManager(private val context: Context) {
     
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val downloadQueue = ArrayDeque<AnimeEntry>()
+    private val downloadQueue = LinkedList<AnimeEntry>()
     private val activeJobs = ConcurrentHashMap<Int, Job>()
     private var semaphore = Semaphore(2)
     private var settings = AppSettings()
