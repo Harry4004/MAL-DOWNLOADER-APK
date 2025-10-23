@@ -21,7 +21,8 @@ fun EnhancedImportTab(
     isProcessing: Boolean,
     onMalImportClick: () -> Unit,
     onTagsImportClick: () -> Unit,
-    customTagsCount: Int
+    customTagsCount: Int,
+    storagePermissionGranted: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -50,6 +51,10 @@ fun EnhancedImportTab(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
+                    text = if (storagePermissionGranted) "✅ Storage permission granted - Ready for downloads" else "❌ Storage permission denied - Downloads will fail",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
                     text = "Ready for enhanced dual-API enrichment & Pictures directory storage",
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -64,7 +69,7 @@ fun EnhancedImportTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = !isProcessing
+            enabled = !isProcessing && storagePermissionGranted
         ) {
             if (isProcessing) {
                 CircularProgressIndicator(
