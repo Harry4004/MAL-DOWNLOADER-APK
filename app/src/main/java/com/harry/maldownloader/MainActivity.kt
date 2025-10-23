@@ -35,7 +35,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
     private lateinit var repository: DownloadRepository
 
-    // Hold critical startup error to display in UI
     private val criticalError = mutableStateOf<Throwable?>(null)
     private val isInitialized = mutableStateOf(false)
 
@@ -44,7 +43,6 @@ class MainActivity : ComponentActivity() {
 
         Log.d("MainActivity", "Starting MAL Downloader v${BuildConfig.APP_VERSION}")
 
-        // Set content first to prevent black screen
         setContent {
             MaldownloaderTheme {
                 when {
@@ -61,7 +59,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Initialize in background to prevent blocking UI
         initializeApp()
     }
 
@@ -69,7 +66,6 @@ class MainActivity : ComponentActivity() {
         try {
             Log.d("MainActivity", "Initializing database and repository")
             
-            // Get database from Application with null safety
             val app = application as MainApplication
             val database = app.database
             
@@ -89,8 +85,6 @@ class MainActivity : ComponentActivity() {
             )[MainViewModel::class.java]
 
             checkPermissions()
-
-            // Mark as initialized
             isInitialized.value = true
             Log.d("MainActivity", "Initialization completed successfully")
             
@@ -104,7 +98,6 @@ class MainActivity : ComponentActivity() {
         try {
             val permissions = mutableListOf<String>()
 
-            // Storage permissions for image saving
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.READ_EXTERNAL_STORAGE
@@ -123,7 +116,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Android 13+ media permissions
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(
                         this,
@@ -252,13 +244,9 @@ fun ErrorScreen(error: Throwable) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Troubleshooting:",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "• Restart the app\n• Clear app data and cache\n• Grant all requested permissions\n• Contact myaninelistapk@gmail.com if issue persists",
-                style = MaterialTheme.typography.bodyMedium
+                text = "Contact: myaninelistapk@gmail.com",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -278,18 +266,15 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     val customTags by viewModel.customTags.collectAsState()
 
     var showTagManager by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showAbout by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     
-    // Enhanced tabs with badges
     val tabs = listOf(
-        "🎥 Import" to "",
-        "📂 Entries" to if (animeEntries.isNotEmpty()) "(${animeEntries.size})" else "",
-        "⬇️ Downloads" to if (downloads.isNotEmpty()) "(${downloads.size})" else "",
-        "📋 Logs" to if (logs.isNotEmpty()) "(${logs.size})" else "",
-        "🔧 Settings" to "",
-        "ℹ️ About" to ""
+        "🎥 Import",
+        "📂 Entries (${animeEntries.size})",
+        "⬇️ Downloads (${downloads.size})",
+        "📋 Logs (${logs.size})",
+        "🔧 Settings",
+        "ℹ️ About"
     )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -320,33 +305,9 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
-                    // Global actions
-                    IconButton(
-                        onClick = { 
-                            // Quick stats
-                            val downloaded = animeEntries.count { !it.imagePath.isNullOrEmpty() }
-                            val adultContent = animeEntries.count { it.isHentai }
-                            val totalTags = animeEntries.sumOf { it.allTags.size }
-                            val avgScore = if (animeEntries.isNotEmpty()) {
-                                animeEntries.mapNotNull { it.score }.average().takeIf { !it.isNaN() }
-                            } else null
-                            
-                            val stats = buildString {
-                                appendLine("📊 MAL Downloader Statistics:")
-                                appendLine("📚 Total Entries: ${animeEntries.size}")
-                                appendLine("⬇️ Downloaded: $downloaded")
-                                appendLine("🏷️ Total Tags: $totalTags")
-                                appendLine("🔞 Adult Content: $adultContent")
-                                avgScore?.let { appendLine("⭐ Average Score: ${String.format("%.1f", it)}") }
-                                appendLine("📋 Log Entries: ${logs.size}")
-                                appendLine("📥 Download Records: ${downloads.size}")
-                            }
-                            viewModel.log(stats)
-                        }
-                    ) {
-                        Icon(Icons.Default.Analytics, "Quick Stats")
+                    IconButton(onClick = { showTagManager = true }) {
+                        Icon(Icons.Default.Settings, "Manage Tags")
                     }
-                    
                     if (logs.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearLogs() }) {
                             Icon(Icons.Default.Clear, "Clear Logs")
@@ -369,34 +330,6 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                 ) {
                     Icon(Icons.Default.Add, "Import XML")
                 }
-                1 -> if (animeEntries.isNotEmpty()) {
-                    FloatingActionButton(
-                        onClick = {
-                            scope.launch {
-                                val downloadable = animeEntries.filter { 
-                                    !it.imageUrl.isNullOrEmpty() && it.imagePath.isNullOrEmpty() 
-                                }
-                                downloadable.forEach { entry ->
-                                    viewModel.downloadImages(entry)
-                                }
-                                viewModel.log("📥 Started batch download for ${downloadable.size} entries")
-                            }
-                        }
-                    ) {
-                        Icon(Icons.Default.GetApp, "Download All")
-                    }
-                }
-                2 -> if (downloads.any { it.status == "failed" }) {
-                    FloatingActionButton(
-                        onClick = {
-                            val failedCount = downloads.count { it.status == "failed" }
-                            viewModel.log("🔄 Retrying $failedCount failed downloads")
-                            // TODO: Implement retry failed functionality
-                        }
-                    ) {
-                        Icon(Icons.Default.Refresh, "Retry Failed")
-                    }
-                }
             }
         }
     ) { paddingValues ->
@@ -405,31 +338,20 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Enhanced tabs with badges and counts
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 modifier = Modifier.fillMaxWidth(),
                 edgePadding = 0.dp
             ) {
-                tabs.forEachIndexed { index, (title, badge) ->
+                tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                                if (badge.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = badge,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         }
                     )
                 }
@@ -441,14 +363,13 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                     .padding(16.dp)
             ) {
                 when (selectedTab) {
-                    0 -> EnhancedImportTab(
+                    0 -> SafeImportTab(
                         viewModel = viewModel,
                         isProcessing = isProcessing,
                         onImportClick = {
                             filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
                         },
-                        customTagsCount = customTags.size,
-                        entriesCount = animeEntries.size
+                        customTagsCount = customTags.size
                     )
                     1 -> EntriesList(
                         viewModel = viewModel,
@@ -459,7 +380,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             }
                         }
                     )
-                    2 -> EnhancedDownloadsTab(
+                    2 -> SafeDownloadsTab(
                         viewModel = viewModel,
                         downloads = downloads
                     )
@@ -489,18 +410,16 @@ fun SafeMainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun EnhancedImportTab(
+fun SafeImportTab(
     viewModel: MainViewModel,
     isProcessing: Boolean,
     onImportClick: () -> Unit,
-    customTagsCount: Int,
-    entriesCount: Int
+    customTagsCount: Int
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Status overview card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -516,139 +435,64 @@ fun EnhancedImportTab(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    StatusChip("API", "Ready", Color(0xFF4CAF50))
-                    StatusChip("Storage", "Pictures", MaterialTheme.colorScheme.primary)
-                    StatusChip("Entries", entriesCount.toString(), MaterialTheme.colorScheme.secondary)
-                    StatusChip("Tags", customTagsCount.toString(), MaterialTheme.colorScheme.tertiary)
-                }
-                
                 Text(
                     text = "Client ID: ${BuildConfig.MAL_CLIENT_ID.take(12)}...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Ready for enhanced API enrichment & Pictures directory storage",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Main import button
         Button(
             onClick = onImportClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(56.dp),
             enabled = !isProcessing
         ) {
             if (isProcessing) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Processing with Enhanced Engine...",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = "API enrichment + Pictures directory storage",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Processing with enhanced API & download engine...")
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.FileUpload,
-                        null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Import MAL XML & Download Images",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "with 25+ Metadata Tags",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
+                Text(
+                    text = "📄 Import MAL XML & Download Images with Metadata",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Secondary action buttons
-        if (!isProcessing && entriesCount > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        // TODO: Re-run metadata enrichment only
-                        viewModel.log("🔄 Re-enriching metadata for $entriesCount entries")
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Refresh Tags")
-                }
-                
-                OutlinedButton(
-                    onClick = {
-                        // TODO: Validate current XML
-                        viewModel.log("🔍 Validating current entries data")
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Validate")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Enhanced features card
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "🚀 Enhanced Features v3.1",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 val features = listOf(
                     "✅ Public Pictures directory storage (gallery visible)",
                     "✅ 25+ Dynamic tags from dual API integration",
                     "✅ XMP metadata embedding (AVES Gallery compatible)",
-                    "✅ Concurrent downloads with smart retry logic",
+                    "✅ Enhanced search, filter & sort functionality",
+                    "✅ Working action buttons with context menus",
                     "✅ Adult content auto-detection & separation",
-                    "✅ Network & battery aware download management",
                     "✅ Real-time progress with comprehensive logging",
-                    "✅ Search, filter & sort with batch operations",
-                    "✅ Custom tag management ($customTagsCount tags loaded)",
-                    "✅ Professional error handling & recovery"
+                    "✅ Professional error handling & recovery",
+                    "✅ Settings & About screens with full controls",
+                    "✅ Custom tag management ($customTagsCount tags loaded)"
                 )
 
                 features.forEach { feature ->
@@ -664,23 +508,75 @@ fun EnhancedImportTab(
 }
 
 @Composable
-fun StatusChip(label: String, value: String, color: Color) {
+fun SafeDownloadsTab(
+    viewModel: MainViewModel,
+    downloads: List<com.harry.maldownloader.data.DownloadItem>
+) {
+    if (downloads.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "⬇️",
+                    style = MaterialTheme.typography.headlineLarge
+                )
+                Text(
+                    text = "No downloads yet",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Import MAL entries and download them with enhanced engine",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    } else {
+        Column {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    DownloadStat("Total", downloads.size.toString(), MaterialTheme.colorScheme.primary)
+                    DownloadStat("Active", downloads.count { it.status == "downloading" }.toString(), MaterialTheme.colorScheme.secondary)
+                    DownloadStat("Complete", downloads.count { it.status == "completed" }.toString(), Color(0xFF4CAF50))
+                    DownloadStat("Failed", downloads.count { it.status == "failed" }.toString(), MaterialTheme.colorScheme.error)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Enhanced download management with XMP metadata embedding and robust retry logic.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun DownloadStat(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = color
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodySmall
         )
     }
 }
 
-// Enhanced MainViewModelFactory with error handling
 class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
