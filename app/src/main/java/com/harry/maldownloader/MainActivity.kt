@@ -262,19 +262,23 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     val logs by viewModel.logs.collectAsState()
     val customTags by viewModel.customTags.collectAsState()
 
-    var showTagManager by remember { mutableStateOf(false) }
+    // Updated state for 4-tab navigation and drawer
     var selectedTab by remember { mutableStateOf(0) }
+    var showDrawer by remember { mutableStateOf(false) }
+    var showTagManager by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     
+    // Only 4 main tabs now
     val tabs = listOf(
         "🎥 Import",
         "📂 Entries (${animeEntries.size})",
         "⬇️ Downloads (${downloads.size})",
-        "📋 Logs (${logs.size})",
-        "🔧 Settings",
-        "ℹ️ About"
+        "📋 Logs (${logs.size})"
     )
 
-    val filePickerLauncher = rememberLauncherForActivityResult(
+    // File pickers for both MAL XML and custom tags XML
+    val malFilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
@@ -283,293 +287,296 @@ fun SafeMainScreen(viewModel: MainViewModel) {
             }
         }
     }
+    
+    val tagsFilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                viewModel.processCustomTagsFile(activity, it)
+            }
+        }
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
+    // Navigation Drawer for Settings/About/etc
+    ModalNavigationDrawer(
+        drawerState = rememberDrawerState(initialValue = if (showDrawer) DrawerValue.Open else DrawerValue.Closed),
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    // Drawer header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "MAL Downloader v${BuildConfig.VERSION_NAME}",
+                            text = "📱 MAL Downloader Menu",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Enhanced Edition - Public Pictures Storage",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showTagManager = true }) {
-                        Icon(Icons.Default.Settings, "Manage Tags")
-                    }
-                    if (logs.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearLogs() }) {
-                            Icon(Icons.Default.Clear, "Clear Logs")
+                        IconButton(onClick = { showDrawer = false }) {
+                            Icon(Icons.Default.Close, "Close Menu")
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        floatingActionButton = {
-            when (selectedTab) {
-                0 -> FloatingActionButton(
-                    onClick = {
-                        filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, "Import XML")
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Menu items
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Label, null) },
+                        label = { Text("🏷️ Custom Tags Manager") },
+                        selected = false,
+                        onClick = {
+                            viewModel.log("🏷️ Opening Custom Tags Manager")
+                            showDrawer = false
+                            showTagManager = true
+                        }
+                    )
+                    
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Settings, null) },
+                        label = { Text("🔧 Settings") },
+                        selected = false,
+                        onClick = {
+                            viewModel.log("🔧 Opening Settings")
+                            showDrawer = false
+                            showSettings = true
+                        }
+                    )
+                    
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Info, null) },
+                        label = { Text("ℹ️ About") },
+                        selected = false,
+                        onClick = {
+                            viewModel.log("ℹ️ Opening About")
+                            showDrawer = false
+                            showAbout = true
+                        }
+                    )
+                    
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Analytics, null) },
+                        label = { Text("📊 Statistics") },
+                        selected = false,
+                        onClick = {
+                            val downloaded = animeEntries.count { !it.imagePath.isNullOrEmpty() }
+                            val adultContent = animeEntries.count { it.isHentai }
+                            val totalTags = animeEntries.sumOf { it.allTags.size }
+                            val avgScore = if (animeEntries.isNotEmpty()) {
+                                animeEntries.mapNotNull { it.score }.average().takeIf { !it.isNaN() }
+                            } else null
+                            
+                            val stats = buildString {
+                                appendLine("📊 MAL Downloader Statistics:")
+                                appendLine("📚 Total Entries: ${animeEntries.size}")
+                                appendLine("⬇️ Downloaded: $downloaded")
+                                appendLine("🏷️ Total Tags: $totalTags")
+                                appendLine("🔞 Adult Content: $adultContent")
+                                avgScore?.let { appendLine("⭐ Average Score: ${String.format("%.1f", it)}") }
+                                appendLine("📋 Log Entries: ${logs.size}")
+                                appendLine("📥 Download Records: ${downloads.size}")
+                            }
+                            viewModel.log(stats)
+                            showDrawer = false
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // App info in drawer
+                    Text(
+                        text = "MAL Downloader v${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Enhanced Edition with 25+ Tags",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                modifier = Modifier.fillMaxWidth(),
-                edgePadding = 0.dp
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
                             Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium
+                                text = "MAL Downloader v${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Enhanced Edition - Public Pictures Storage",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                when (selectedTab) {
-                    0 -> SafeImportTab(
-                        viewModel = viewModel,
-                        isProcessing = isProcessing,
-                        onImportClick = {
-                            filePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
-                        },
-                        customTagsCount = customTags.size
-                    )
-                    1 -> EntriesList(
-                        viewModel = viewModel,
-                        entries = animeEntries,
-                        onDownloadClick = { entry ->
-                            scope.launch {
-                                viewModel.downloadImages(entry)
+                    },
+                    actions = {
+                        // Hamburger menu button (replaces individual Settings button)
+                        IconButton(onClick = { showDrawer = !showDrawer }) {
+                            Icon(
+                                imageVector = if (showDrawer) Icons.Default.Close else Icons.Default.Menu,
+                                contentDescription = if (showDrawer) "Close Menu" else "Open Menu"
+                            )
+                        }
+                        
+                        // Keep clear logs button for quick access
+                        if (logs.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.clearLogs() }) {
+                                Icon(Icons.Default.Clear, "Clear Logs")
                             }
                         }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                    2 -> SafeDownloadsTab(
-                        viewModel = viewModel,
-                        downloads = downloads
-                    )
-                    3 -> EnhancedLogsPanel(
-                        viewModel = viewModel,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    4 -> SettingsScreen(
-                        viewModel = viewModel,
-                        onDismiss = { selectedTab = 0 }
-                    )
-                    5 -> AboutScreen(
-                        viewModel = viewModel,
-                        onDismiss = { selectedTab = 0 }
-                    )
+                )
+            },
+            floatingActionButton = {
+                // Context-sensitive FAB based on current tab
+                when (selectedTab) {
+                    0 -> FloatingActionButton(
+                        onClick = {
+                            malFilePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
+                        },
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(Icons.Default.Add, "Import XML")
+                    }
+                    1 -> if (animeEntries.isNotEmpty()) {
+                        FloatingActionButton(
+                            onClick = {
+                                scope.launch {
+                                    val downloadable = animeEntries.filter { 
+                                        !it.imageUrl.isNullOrEmpty() && it.imagePath.isNullOrEmpty() 
+                                    }
+                                    downloadable.forEach { entry ->
+                                        viewModel.downloadImages(entry)
+                                    }
+                                    viewModel.log("📥 Started batch download for ${downloadable.size} entries")
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.GetApp, "Download All")
+                        }
+                    }
+                    2 -> if (downloads.any { it.status == "failed" }) {
+                        FloatingActionButton(
+                            onClick = {
+                                val failedCount = downloads.count { it.status == "failed" }
+                                viewModel.log("🔄 Retrying $failedCount failed downloads")
+                                // TODO: Implement retry failed functionality
+                            }
+                        ) {
+                            Icon(Icons.Default.Refresh, "Retry Failed")
+                        }
+                    }
+                }
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // Updated tab row with only 4 tabs
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    when (selectedTab) {
+                        0 -> EnhancedImportTab(
+                            viewModel = viewModel,
+                            isProcessing = isProcessing,
+                            onMalImportClick = {
+                                malFilePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
+                            },
+                            onTagsImportClick = {
+                                tagsFilePickerLauncher.launch(arrayOf("text/xml", "application/xml"))
+                            },
+                            customTagsCount = customTags.size
+                        )
+                        1 -> EnhancedEntriesList(
+                            viewModel = viewModel,
+                            entries = animeEntries,
+                            onDownloadClick = { entry ->
+                                scope.launch {
+                                    viewModel.downloadImages(entry)
+                                }
+                            }
+                        )
+                        2 -> EnhancedDownloadsTab(
+                            viewModel = viewModel,
+                            downloads = downloads
+                        )
+                        3 -> EnhancedLogsPanel(
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
     }
 
+    // Handle drawer state changes
+    LaunchedEffect(showDrawer) {
+        // Additional logic if needed for drawer state
+    }
+    
+    // Preserve all existing dialogs
     if (showTagManager) {
         TagManagerDialog(
             viewModel = viewModel,
             onDismiss = { showTagManager = false }
         )
     }
-}
-
-@Composable
-fun SafeImportTab(
-    @Suppress("UNUSED_PARAMETER") viewModel: MainViewModel,
-    isProcessing: Boolean,
-    onImportClick: () -> Unit,
-    customTagsCount: Int
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "🎯 MAL Authentication & Status",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Client ID: ${AppBuildInfo.MAL_CLIENT_ID.take(12)}...",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Ready for enhanced API enrichment & Pictures directory storage",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = onImportClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            enabled = !isProcessing
-        ) {
-            if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Processing with enhanced API & download engine...")
-            } else {
-                Text(
-                    text = "📄 Import MAL XML & Download Images with Metadata",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "🚀 Enhanced Features v${AppBuildInfo.APP_VERSION}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val features = listOf(
-                    "✅ Public Pictures directory storage (gallery visible)",
-                    "✅ 25+ Dynamic tags from dual API integration",
-                    "✅ XMP metadata embedding (AVES Gallery compatible)",
-                    "✅ Enhanced search, filter & sort functionality",
-                    "✅ Working action buttons with context menus",
-                    "✅ Adult content auto-detection & separation",
-                    "✅ Real-time progress with comprehensive logging",
-                    "✅ Professional error handling & recovery",
-                    "✅ Settings & About screens with full controls",
-                    "✅ Custom tag management ($customTagsCount tags loaded)"
-                )
-
-                features.forEach { feature ->
-                    Text(
-                        text = feature,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 1.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SafeDownloadsTab(
-    @Suppress("UNUSED_PARAMETER") viewModel: MainViewModel,
-    downloads: List<com.harry.maldownloader.data.DownloadItem>
-) {
-    if (downloads.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "⬇️",
-                    style = MaterialTheme.typography.headlineLarge
-                )
-                Text(
-                    text = "No downloads yet",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Import MAL entries and download them with enhanced engine",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    } else {
-        Column {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    DownloadStat("Total", downloads.size.toString(), MaterialTheme.colorScheme.primary)
-                    DownloadStat("Active", downloads.count { it.status == "downloading" }.toString(), MaterialTheme.colorScheme.secondary)
-                    DownloadStat("Complete", downloads.count { it.status == "completed" }.toString(), Color(0xFF4CAF50))
-                    DownloadStat("Failed", downloads.count { it.status == "failed" }.toString(), MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Enhanced download management with XMP metadata embedding and robust retry logic.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun DownloadStat(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = color
+    
+    if (showSettings) {
+        SettingsDialog(
+            viewModel = viewModel,
+            onDismiss = { showSettings = false }
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall
+    }
+    
+    if (showAbout) {
+        AboutDialog(
+            viewModel = viewModel,
+            onDismiss = { showAbout = false }
         )
     }
 }
