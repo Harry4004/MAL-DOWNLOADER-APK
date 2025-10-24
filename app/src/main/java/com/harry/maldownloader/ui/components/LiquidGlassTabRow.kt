@@ -3,8 +3,8 @@ package com.harry.maldownloader.ui.components
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,9 +28,7 @@ fun LiquidGlassTabRow(
         modifier = Modifier
             .fillMaxWidth()
             .pointerInput(Unit) {
-                detectHorizontalDragGestures { _, dragAmount ->
-                    onSwipeNavigation(dragAmount)
-                }
+                detectHorizontalDragGestures { _, dragAmount -> onSwipeNavigation(dragAmount) }
             },
         cornerRadius = 0.dp,
         surfaceAlpha = 0.1f,
@@ -77,32 +75,23 @@ fun LiquidGlassTabIndicator(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Spring animations for selection
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.05f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        animationSpec = spring(),
         label = "Tab scale"
     )
-    
     val surfaceAlpha by animateFloatAsState(
         targetValue = if (selected) 0.25f else 0.08f,
         animationSpec = tween(300, easing = EaseInOutCubic),
         label = "Tab surface alpha"
     )
-    
     val highlightStrength by animateFloatAsState(
         targetValue = if (selected) 0.2f else 0.05f,
         animationSpec = tween(300, easing = EaseInOutCubic),
         label = "Tab highlight"
     )
 
-    Box(
-        modifier = modifier.padding(horizontal = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
         GlassSurface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,24 +112,16 @@ fun LiquidGlassTabIndicator(
                     text = title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        
-        // Invisible clickable overlay
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(44.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .pointerInput(Unit) {
-                    detectTapGestures { onClick() }
-                }
+                .pointerInput(Unit) { detectTapGestures { onClick() } }
         )
     }
 }
