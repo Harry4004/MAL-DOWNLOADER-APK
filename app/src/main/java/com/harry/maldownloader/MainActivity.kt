@@ -9,8 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,8 +27,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -42,7 +46,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.*
-import com.harry.maldownloader.ui.theme.MaldownloaderTheme
+import com.harry.maldownloader.ui.theme.LiquidGlassTheme
 import com.harry.maldownloader.utils.AppBuildInfo
 import kotlinx.coroutines.launch
 
@@ -79,11 +83,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaldownloaderTheme {
+            LiquidGlassTheme {
                 when {
                     criticalError.value != null -> ErrorScreen(error = criticalError.value!!)
                     !isInitialized.value -> LoadingScreen()
-                    else -> SafeMainScreen(viewModel = viewModel)
+                    else -> LiquidGlassMainScreen(viewModel = viewModel)
                 }
             }
         }
@@ -152,39 +156,107 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LoadingScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            CircularProgressIndicator(modifier = Modifier.size(64.dp), strokeWidth = 6.dp)
-            Spacer(Modifier.height(16.dp))
-            Text("🚀 Initializing MAL Downloader...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(8.dp))
-            Text("Enhanced Edition v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-fun ErrorScreen(error: Throwable) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.9f).padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF007AFF).copy(alpha = 0.05f),
+                        Color.Transparent
+                    ),
+                    radius = 1000f
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            surfaceAlpha = 0.15f,
+            cornerRadius = 28.dp
         ) {
-            Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Error, "Error", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
-                Spacer(Modifier.height(16.dp))
-                Text("❌ Critical Error", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+            Column(
+                modifier = Modifier.padding(48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(64.dp),
+                    strokeWidth = 6.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = "🚀 Initializing MAL Downloader...",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Spacer(Modifier.height(8.dp))
-                Text(error.message ?: "Unknown error occurred", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
-                Spacer(Modifier.height(16.dp))
-                Text("Please restart the app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(
+                    text = "Liquid Glass Edition v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
 @Composable
-fun ModernDrawer(
+fun ErrorScreen(error: Throwable) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
+                        Color.Transparent
+                    ),
+                    radius = 1000f
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        GlassCard(
+            surfaceAlpha = 0.15f,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = "Error",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = "❌ Critical Error",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = error.message ?: "Unknown error occurred",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = "Please restart the app",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LiquidGlassDrawer(
     onClose: () -> Unit,
     onCustomTagsClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -192,50 +264,91 @@ fun ModernDrawer(
     storagePermissionGranted: Boolean,
     notificationPermissionGranted: Boolean
 ) {
-    Surface(
-        modifier = Modifier.fillMaxHeight().width(320.dp),
-        color = Color.Black.copy(alpha = 0.85f),
-        shape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp)
+    GlassSurface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(340.dp),
+        cornerRadius = 28.dp,
+        surfaceAlpha = 0.18f,
+        borderAlpha = 0.3f,
+        highlightStrength = 0.2f,
+        tintColor = Color.Black,
+        backdropEnabled = true
     ) {
-        Box {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.1f), Color.White.copy(alpha = 0.05f)))))
-            Column(Modifier.fillMaxSize().padding(24.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("📱 Menu", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onClose, modifier = Modifier.size(48.dp).semantics { contentDescription = "Close menu"; role = Role.Button }) {
-                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
-                }
-                Spacer(Modifier.height(32.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(12.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(28.dp)
+        ) {
+            // Header with close button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "📱 Menu",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.1f))
                 ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Permission Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        PermissionStatusRow("Storage", storagePermissionGranted)
-                        PermissionStatusRow("Notifications", notificationPermissionGranted)
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(32.dp))
+            
+            // Permission Status with glass card
+            GlassCard(
+                surfaceAlpha = 0.12f,
+                cornerRadius = 20.dp
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Security, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Permission Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
+                    Spacer(Modifier.height(16.dp))
+                    PermissionStatusRow("Storage", storagePermissionGranted)
+                    Spacer(Modifier.height(8.dp))
+                    PermissionStatusRow("Notifications", notificationPermissionGranted)
                 }
-                Spacer(Modifier.height(24.dp))
-                MenuItemWithIcon(Icons.Default.Tag, "Custom Tags Manager", "Organize your collection") {
-                    onClose()
-                    onCustomTagsClick()
-                }
-                MenuItemWithIcon(Icons.Default.Settings, "Settings", "App configuration") {
-                    onClose()
-                    onSettingsClick()
-                }
-                MenuItemWithIcon(Icons.Default.Info, "About", "App information") {
-                    onClose()
-                    onAboutClick()
-                }
+            }
+            
+            Spacer(Modifier.height(28.dp))
+            
+            // Menu items with glass effects
+            GlassMenuItemWithIcon(Icons.Default.Label, "Custom Tags Manager", "Organize your collection") {
+                onClose()
+                onCustomTagsClick()
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            GlassMenuItemWithIcon(Icons.Default.Settings, "Settings", "App configuration") {
+                onClose()
+                onSettingsClick()
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            GlassMenuItemWithIcon(Icons.Default.Info, "About", "App information") {
+                onClose()
+                onAboutClick()
             }
         }
     }
@@ -243,41 +356,88 @@ fun ModernDrawer(
 
 @Composable
 fun PermissionStatusRow(name: String, granted: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Icon(
-            if (granted) Icons.Default.CheckCircle else Icons.Default.Error,
-            null,
-            tint = if (granted) Color.Green else Color.Red,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(Modifier.width(8.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(
+                    if (granted) Color(0xFF34C759).copy(alpha = 0.8f) 
+                    else Color(0xFFFF453A).copy(alpha = 0.8f)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (granted) Icons.Default.Check else Icons.Default.Close,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(10.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Text(
-            "$name: ${if (granted) "Granted" else "Denied"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.9f)
+            text = "$name: ${if (granted) "Granted" else "Denied"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.95f)
         )
     }
 }
 
 @Composable
-fun MenuItemWithIcon(
+fun GlassMenuItemWithIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
-        shape = RoundedCornerShape(12.dp),
-        onClick = onClick
+    GlassCard(
+        onClick = onClick,
+        surfaceAlpha = 0.1f,
+        cornerRadius = 18.dp
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium, color = Color.White)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
             }
         }
     }
@@ -285,7 +445,7 @@ fun MenuItemWithIcon(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SafeMainScreen(viewModel: MainViewModel) {
+fun LiquidGlassMainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
     val scope = rememberCoroutineScope()
@@ -320,112 +480,71 @@ fun SafeMainScreen(viewModel: MainViewModel) {
         uri?.let { scope.launch { viewModel.processCustomTagsFile(activity, it) } }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        // Track page changes
-    }
-
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModernDrawer(
-                onClose = { scope.launch { drawerState.close() } },
-                onCustomTagsClick = { showTagManager = true },
-                onSettingsClick = { showSettings = true },
-                onAboutClick = { showAbout = true },
-                storagePermissionGranted = storagePermissionGranted,
-                notificationPermissionGranted = notificationPermissionGranted
+    // Background with subtle gradient
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
             )
-        },
-        gesturesEnabled = true,
-        modifier = Modifier.pointerInput(Unit) {
-            detectDragGestures(onDragStart = { offset ->
-                if (offset.x > size.width * 0.9f) {
-                    scope.launch { drawerState.open() }
-                }
-            }) { _, _ -> }
-        }
     ) {
-        Scaffold(
-            topBar = {
-                // Glassmorphism top bar with conditional hamburger visibility
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color.White.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                ) {
-                    Box(Modifier.background(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.12f))))) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Hide hamburger when drawer is open
-                            val hamburgerAlpha: Float by animateFloatAsState(
-                                targetValue = if (drawerState.isOpen) 0f else 1f,
-                                animationSpec = tween(300),
-                                label = "Hamburger visibility"
-                            )
-                            
-                            IconButton(
-                                onClick = { scope.launch { if (drawerState.isClosed) drawerState.open() else drawerState.close() } },
-                                modifier = Modifier.size(48.dp).alpha(hamburgerAlpha).semantics {
-                                    contentDescription = "Open navigation menu"
-                                    role = Role.Button
-                                }
-                            ) {
-                                Icon(Icons.Default.Menu, null, modifier = Modifier.size(24.dp))
-                            }
-                            
-                            Text("MAL Downloader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            
-                            if (pagerState.currentPage == 3 && logs.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.clearLogs() }, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Clear, null, modifier = Modifier.size(24.dp))
-                                }
-                            } else {
-                                Spacer(Modifier.size(48.dp))
-                            }
-                        }
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                LiquidGlassDrawer(
+                    onClose = { scope.launch { drawerState.close() } },
+                    onCustomTagsClick = { showTagManager = true },
+                    onSettingsClick = { showSettings = true },
+                    onAboutClick = { showAbout = true },
+                    storagePermissionGranted = storagePermissionGranted,
+                    notificationPermissionGranted = notificationPermissionGranted
+                )
+            },
+            gesturesEnabled = true,
+            modifier = Modifier.pointerInput(Unit) {
+                detectDragGestures(onDragStart = { offset ->
+                    if (offset.x > size.width * 0.9f) {
+                        scope.launch { drawerState.open() }
                     }
-                }
+                }) { _, _ -> }
             }
-        ) { paddingValues ->
-            Column(Modifier.fillMaxSize().padding(paddingValues)) {
-                // Glassmorphism tab indicators with swipe support
-                Surface(
-                    modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, dragAmount ->
-                            scope.launch {
-                                val newPage = when {
-                                    dragAmount < 0 && pagerState.currentPage < 3 -> pagerState.currentPage + 1
-                                    dragAmount > 0 && pagerState.currentPage > 0 -> pagerState.currentPage - 1
-                                    else -> pagerState.currentPage
-                                }
-                                pagerState.animateScrollToPage(newPage)
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                // Liquid Glass Top Bar
+                LiquidGlassTopBar(
+                    drawerState = drawerState,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onClearLogsClick = { viewModel.clearLogs() },
+                    showClearButton = pagerState.currentPage == 3 && logs.isNotEmpty()
+                )
+                
+                // Glass Tab Row with swipe navigation
+                LiquidGlassTabRow(
+                    tabs = tabs,
+                    selectedTab = pagerState.currentPage,
+                    onTabSelected = { scope.launch { pagerState.animateScrollToPage(it) } },
+                    onSwipeNavigation = { direction ->
+                        scope.launch {
+                            val newPage = when {
+                                direction < 0 && pagerState.currentPage < 3 -> pagerState.currentPage + 1
+                                direction > 0 && pagerState.currentPage > 0 -> pagerState.currentPage - 1
+                                else -> pagerState.currentPage
                             }
-                        }
-                    },
-                    color = Color.White.copy(alpha = 0.08f)
-                ) {
-                    Box(Modifier.background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.06f), Color.Transparent)))) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            tabs.forEachIndexed { index, title ->
-                                GlassyTabIndicator(
-                                    title = title,
-                                    selected = pagerState.currentPage == index,
-                                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } }
-                                )
-                            }
+                            pagerState.animateScrollToPage(newPage)
                         }
                     }
-                }
+                )
                 
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize().padding(12.dp)) { page ->
+                // Content with HorizontalPager
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize().padding(16.dp)) { page ->
                     when (page) {
-                        0 -> EnhancedImportTab(
+                        0 -> LiquidGlassImportTab(
                             viewModel = viewModel,
                             isProcessing = isProcessing,
                             onMalImportClick = { malFilePickerLauncher.launch(arrayOf("text/xml", "application/xml")) },
@@ -434,54 +553,35 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             storagePermissionGranted = storagePermissionGranted,
                             onMenuSwipe = { scope.launch { drawerState.open() } }
                         )
-                        1 -> EnhancedEntriesList(viewModel = viewModel, entries = animeEntries) { entry ->
+                        1 -> LiquidGlassEntriesList(
+                            viewModel = viewModel,
+                            entries = animeEntries
+                        ) { entry ->
                             scope.launch { viewModel.downloadImages(entry) }
                         }
-                        2 -> EnhancedDownloadsTab(viewModel = viewModel, downloads = downloads)
-                        3 -> EnhancedLogsPanel(viewModel = viewModel, modifier = Modifier.fillMaxSize())
+                        2 -> LiquidGlassDownloadsTab(
+                            viewModel = viewModel,
+                            downloads = downloads
+                        )
+                        3 -> LiquidGlassLogsPanel(
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
             }
         }
     }
 
+    // Glass dialogs
     if (showTagManager) {
-        TagManagerDialog(viewModel = viewModel) { showTagManager = false }
+        LiquidGlassTagManagerDialog(viewModel = viewModel) { showTagManager = false }
     }
     if (showSettings) {
-        SettingsDialog(viewModel = viewModel) { showSettings = false }
+        LiquidGlassSettingsDialog(viewModel = viewModel) { showSettings = false }
     }
     if (showAbout) {
-        AboutDialog(viewModel = viewModel) { showAbout = false }
-    }
-}
-
-@Composable
-fun GlassyTabIndicator(title: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.padding(4.dp),
-        color = if (selected) Color.White.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    if (selected) 
-                        Brush.radialGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.1f)))
-                    else 
-                        Brush.radialGradient(listOf(Color.White.copy(alpha = 0.05f), Color.Transparent))
-                )
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        LiquidGlassAboutDialog(viewModel = viewModel) { showAbout = false }
     }
 }
 
