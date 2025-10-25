@@ -26,11 +26,51 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
+import com.harry.maldownloader.ui.icons.MALIcons
 
 /**
  * Modern UI Components for MAL Downloader
  * Step 1: Foundation components with glassmorphism design
  */
+
+/**
+ * NEW: MalIcon composable for custom animated icons
+ * Handles tinting, scaling, and selection states
+ */
+@Composable
+fun MalIcon(
+    icon: ImageVector,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = 28.dp
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed || selected) 1.07f else 1f,
+        animationSpec = tween(durationMillis = 200),
+        label = "icon-scale"
+    )
+
+    Surface(
+        modifier = modifier
+            .size(size)
+            .scale(scale),
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+    ) {
+        Box(
+            modifier = Modifier.size(size),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size((size.value * 0.6f).dp)
+            )
+        }
+    }
+}
 
 @Composable
 fun ModernGlassCard(
@@ -443,7 +483,8 @@ fun AnimatedTabRow(
     selectedTabIndex: Int,
     tabs: List<String>,
     onTabSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconScale: Float = 1.0f
 ) {
     ModernGlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -456,33 +497,43 @@ fun AnimatedTabRow(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             tabs.forEachIndexed { index, title ->
+                // NEW: Map tab titles to custom icons
+                val icon = when {
+                    title.contains("Import") || title.contains("📂") -> MALIcons.Import
+                    title.contains("Entries") || title.contains("🍥") -> MALIcons.Entries
+                    title.contains("Downloads") || title.contains("⬇") -> MALIcons.Downloads
+                    title.contains("Logs") || title.contains("📋") -> MALIcons.Logs
+                    else -> MALIcons.App
+                }
+                
                 AnimatedTabItem(
-                    title = title,
+                    icon = icon,
                     selected = selectedTabIndex == index,
                     onClick = { onTabSelected(index) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    iconSize = (28.dp.value * iconScale).dp
                 )
             }
         }
     }
 }
 
+/**
+ * UPDATED: AnimatedTabItem now uses custom icons instead of text
+ * Clean icon-only design with animated selection state
+ */
 @Composable
 fun AnimatedTabItem(
-    title: String,
+    icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 28.dp
 ) {
     val bgColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
         animationSpec = tween(200),
         label = "tab-bg"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(200),
-        label = "tab-fg"
     )
 
     Surface(
@@ -491,35 +542,16 @@ fun AnimatedTabItem(
         color = bgColor,
         shape = RoundedCornerShape(14.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            contentAlignment = Alignment.Center
         ) {
-            // App-styled glyph: use string contains instead of char literals
-            val glyph = when {
-                title.contains("🍥") -> "🍥"
-                title.contains("📂") -> "📂"
-                title.contains("⬇") -> "⬇️"
-                title.contains("📋") -> "📋"
-                else -> "•"
-            }
-            Text(
-                text = glyph,
-                color = contentColor,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Clip
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = title.replace("\n", " "),
-                color = contentColor,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            MalIcon(
+                icon = icon,
+                selected = selected,
+                size = iconSize
             )
         }
     }
