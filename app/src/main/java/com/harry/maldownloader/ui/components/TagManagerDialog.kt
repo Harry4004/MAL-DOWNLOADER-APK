@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-имport com.harry.maldownloader.MainViewModel
+import com.harry.maldownloader.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
