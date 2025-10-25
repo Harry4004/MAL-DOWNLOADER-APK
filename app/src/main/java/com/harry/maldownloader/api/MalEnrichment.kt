@@ -1,9 +1,5 @@
-package com.harry.maldownloader
+package com.harry.maldownloader.api
 
-import com.harry.maldownloader.api.MalAnimeResponse
-import com.harry.maldownloader.api.MalApiService
-import com.harry.maldownloader.api.MalMangaResponse
-import com.harry.maldownloader.api.toEntryTags
 import retrofit2.Response
 
 suspend fun MalApiService.fetchAnimeEnriched(id: Int, clientId: String): Pair<List<String>, String?>? {
