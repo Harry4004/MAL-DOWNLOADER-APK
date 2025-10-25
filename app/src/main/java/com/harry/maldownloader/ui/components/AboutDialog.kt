@@ -280,7 +280,7 @@ fun AboutDialog(
                     }
                     
                     Column(
-                        horizontalAlignment = Alignment.CenterVertically
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "100%",
