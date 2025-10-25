@@ -387,77 +387,81 @@ class MainViewModel @Inject constructor(
         log("🌐 Attempting Jikan API enrichment for: ${entry.title}")
         
         // First, try the full endpoint with retry/backoff
-        val primary = runCatching {
-            when (entry.type) {
+        try {
+            val response = when (entry.type) {
                 "anime" -> jikanApi.retryAnimeFull(entry.malId)
                 "manga" -> jikanApi.retryMangaFull(entry.malId)
                 else -> null
             }
-        }.getOrNull()
-
-        primary?.let { resp ->
-            if (resp.isSuccessful) {
-                val result = when (entry.type) {
-                    "anime" -> {
-                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
-                        r.body()?.data?.let { enrichAnimeEntry(entry, it) }
+            
+            response?.let { resp ->
+                if (resp.isSuccessful) {
+                    return when (entry.type) {
+                        "anime" -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val animeResp = resp as retrofit2.Response<AnimeResponse>
+                            animeResp.body()?.data?.let { enrichAnimeEntry(entry, it) }
+                        }
+                        "manga" -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val mangaResp = resp as retrofit2.Response<MangaResponse>
+                            mangaResp.body()?.data?.let { enrichMangaEntry(entry, it) }
+                        }
+                        else -> null
+                    }?.also {
+                        log("✅ Jikan full enrichment successful: ${it.allTags.size} tags")
                     }
-                    "manga" -> {
-                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<MangaResponse>
-                        r.body()?.data?.let { enrichMangaEntry(entry, it) }
-                    }
-                    else -> null
-                }
-                if (result != null) {
-                    log("✅ Jikan full enrichment successful: ${result.allTags.size} tags")
-                    return result
-                }
-            } else {
-                val code = resp.code()
-                val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
-                val errorMsg = "Jikan full failed: HTTP $code ${err ?: ""}".trim()
-                log("❌ $errorMsg")
-                if (code == 429) {
-                    UiBus.errors.tryEmit("Jikan rate limited, using fallback")
                 } else {
-                    UiBus.errors.tryEmit("Jikan API: HTTP $code for ${entry.title}")
+                    val code = resp.code()
+                    val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
+                    val errorMsg = "Jikan full failed: HTTP $code ${err ?: ""}".trim()
+                    log("❌ $errorMsg")
+                    if (code == 429) {
+                        UiBus.errors.tryEmit("Jikan rate limited, using fallback")
+                    } else {
+                        UiBus.errors.tryEmit("Jikan API: HTTP $code for ${entry.title}")
+                    }
                 }
             }
+        } catch (e: Exception) {
+            log("❌ Jikan full endpoint exception: ${e.message}")
         }
 
         // Fallback to lightweight endpoint
-        val fallback = runCatching {
-            when (entry.type) {
-                "anime" -> jikanApi.getAnime(entry.malId)
-                "manga" -> jikanApi.getManga(entry.malId)
+        try {
+            val response = when (entry.type) {
+                "anime" -> jikanApi.retryAnime(entry.malId)
+                "manga" -> jikanApi.retryManga(entry.malId)
                 else -> null
             }
-        }.getOrNull()
-
-        fallback?.let { resp ->
-            if (resp.isSuccessful) {
-                val result = when (entry.type) {
-                    "anime" -> {
-                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
-                        r.body()?.data?.let { enrichAnimeEntry(entry, it) }
+            
+            response?.let { resp ->
+                if (resp.isSuccessful) {
+                    return when (entry.type) {
+                        "anime" -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val animeResp = resp as retrofit2.Response<AnimeResponse>
+                            animeResp.body()?.data?.let { enrichAnimeEntry(entry, it) }
+                        }
+                        "manga" -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val mangaResp = resp as retrofit2.Response<MangaResponse>
+                            mangaResp.body()?.data?.let { enrichMangaEntry(entry, it) }
+                        }
+                        else -> null
+                    }?.also {
+                        log("✅ Jikan fallback enrichment successful: ${it.allTags.size} tags")
                     }
-                    "manga" -> {
-                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<MangaResponse>
-                        r.body()?.data?.let { enrichMangaEntry(entry, it) }
-                    }
-                    else -> null
+                } else {
+                    val code = resp.code()
+                    val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
+                    val errorMsg = "Jikan fallback failed: HTTP $code ${err ?: ""}".trim()
+                    log("❌ $errorMsg")
+                    UiBus.errors.tryEmit("Jikan fallback: HTTP $code for ${entry.title}")
                 }
-                if (result != null) {
-                    log("✅ Jikan fallback enrichment successful: ${result.allTags.size} tags")
-                    return result
-                }
-            } else {
-                val code = resp.code()
-                val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
-                val errorMsg = "Jikan fallback failed: HTTP $code ${err ?: ""}".trim()
-                log("❌ $errorMsg")
-                UiBus.errors.tryEmit("Jikan fallback: HTTP $code for ${entry.title}")
             }
+        } catch (e: Exception) {
+            log("❌ Jikan fallback exception: ${e.message}")
         }
 
         // Final fallback with minimal tags
