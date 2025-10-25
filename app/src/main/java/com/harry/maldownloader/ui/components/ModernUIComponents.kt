@@ -379,6 +379,95 @@ enum class ModernButtonVariant {
 }
 
 @Composable
+fun GlassmorphismTopBar(
+    title: String,
+    onMenuClick: () -> Unit,
+    onActionClick: (() -> Unit)? = null,
+    actionIcon: ImageVector? = null,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        shadowElevation = 12.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.15f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ModernIconButton(
+                    onClick = onMenuClick,
+                    icon = Icons.Default.Menu,
+                    contentDescription = "Open menu"
+                )
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (onActionClick != null && actionIcon != null) {
+                    ModernIconButton(
+                        onClick = onActionClick,
+                        icon = actionIcon,
+                        contentDescription = null
+                    )
+                } else {
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedTabRow(
+    selectedTabIndex: Int,
+    tabs: List<String>,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ModernGlassCard(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadius = 20.dp,
+        elevation = 8.dp,
+        glowIntensity = 0.1f
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            tabs.forEachIndexed { index, title ->
+                AnimatedTabItem(
+                    title = title,
+                    selected = selectedTabIndex == index,
+                    onClick = { onTabSelected(index) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun AnimatedTabItem(
     title: String,
     selected: Boolean,
@@ -409,15 +498,16 @@ fun AnimatedTabItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            // App-styled glyph: large size, themed color (not OS default emoji color)
+            // App-styled glyph: use string contains instead of char literals
+            val glyph = when {
+                title.contains("🍥") -> "🍥"
+                title.contains("📂") -> "📂"
+                title.contains("⬇") -> "⬇️"
+                title.contains("📋") -> "📋"
+                else -> "•"
+            }
             Text(
-                text = when (title.firstOrNull()) {
-                    '🍥' -> "🍥"
-                    '📂' -> "📂"
-                    '⬇' -> "⬇️"
-                    '📋' -> "📋"
-                    else -> "•"
-                },
+                text = glyph,
                 color = contentColor,
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
@@ -431,6 +521,263 @@ fun AnimatedTabItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+fun ModernGlassmorphismDrawer(
+    onClose: () -> Unit,
+    onCustomTagsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onAboutClick: () -> Unit,
+    storagePermissionGranted: Boolean,
+    notificationPermissionGranted: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxHeight().width(340.dp),
+        color = Color.Transparent
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.92f),
+                            Color.Black.copy(alpha = 0.75f)
+                        )
+                    )
+                )
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.12f),
+                            Color.White.copy(alpha = 0.06f),
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.04f)
+                        )
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(28.dp)
+            ) {
+                // Header section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "MAL Downloader",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Enhanced Edition",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                    
+                    ModernIconButton(
+                        onClick = onClose,
+                        icon = Icons.Default.Close,
+                        contentDescription = "Close menu",
+                        containerColor = Color.White.copy(alpha = 0.15f),
+                        contentColor = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                // Permission status card
+                ModernGlassCard(
+                    cornerRadius = 16.dp,
+                    glowIntensity = 0.2f
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Security,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            "System Permissions",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    ModernPermissionChip("Storage Access", storagePermissionGranted)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ModernPermissionChip("Notifications", notificationPermissionGranted)
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Menu items
+                ModernDrawerMenuItem(
+                    icon = Icons.Default.Tag,
+                    title = "Custom Tags Manager",
+                    subtitle = "Organize your anime collection",
+                    onClick = {
+                        onClose()
+                        onCustomTagsClick()
+                    }
+                )
+
+                ModernDrawerMenuItem(
+                    icon = Icons.Default.Settings,
+                    title = "Application Settings",
+                    subtitle = "Configure app behavior",
+                    onClick = {
+                        onClose()
+                        onSettingsClick()
+                    }
+                )
+
+                ModernDrawerMenuItem(
+                    icon = Icons.Default.Info,
+                    title = "About & Information",
+                    subtitle = "App details and credits",
+                    onClick = {
+                        onClose()
+                        onAboutClick()
+                    }
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Footer
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Enhanced UI • Modern Design",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernPermissionChip(name: String, granted: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (granted) 
+            Color.Green.copy(alpha = 0.25f) 
+        else 
+            Color.Red.copy(alpha = 0.25f),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (granted) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                contentDescription = null,
+                tint = if (granted) Color.Green else Color.Red,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "$name: ${if (granted) "Granted" else "Required"}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernDrawerMenuItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        color = Color.White.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.12f),
+                            Color.White.copy(alpha = 0.06f)
+                        )
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    color = Color.White.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(20.dp))
+                
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            }
         }
     }
 }
