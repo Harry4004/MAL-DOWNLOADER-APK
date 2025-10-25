@@ -1,4 +1,4 @@
-package com.harry.maldownloader
+package com.harry.maldownloader.utils
 
 import kotlinx.coroutines.delay
 import retrofit2.Response
@@ -11,18 +11,26 @@ suspend fun <T> retryWithBackoff(
 ): Response<T> {
     var attempt = 0
     var delayMs = initialDelayMs
-    var last: Response<T>? = null
+    var lastResponse: Response<T>? = null
+    
     while (attempt < maxAttempts) {
-        val resp = runCatching { block() }.getOrNull()
-        if (resp == null) {
-            attempt++
-        } else {
-            if (resp.code() != 429) return resp
-            last = resp
-            attempt++
+        try {
+            val response = block()
+            if (response.code() != 429) {
+                return response
+            }
+            lastResponse = response
+        } catch (e: Exception) {
+            // Network error, continue to retry
         }
-        if (attempt < maxAttempts) delay(delayMs)
-        delayMs = (delayMs * factor).toLong().coerceAtMost(6000)
+        
+        attempt++
+        if (attempt < maxAttempts) {
+            delay(delayMs)
+            delayMs = (delayMs * factor).toLong().coerceAtMost(6000)
+        }
     }
-    return last ?: block() // last try
+    
+    // Return last response or try once more
+    return lastResponse ?: block()
 }
