@@ -56,7 +56,26 @@ interface SettingsDao {
     @Query("UPDATE app_settings SET enableDetailedLogs = :value WHERE id = 1")
     suspend fun updateEnableDetailedLogs(value: Boolean)
     
+    // UI Scaling methods
+    @Query("UPDATE app_settings SET iconScale = :value WHERE id = 1")
+    suspend fun updateIconScale(value: Float)
+    
+    @Query("UPDATE app_settings SET fontScale = :value WHERE id = 1")
+    suspend fun updateFontScale(value: Float)
+    
+    // Convenience method to get just the scaling values
+    @Query("SELECT iconScale, fontScale FROM app_settings WHERE id = 1 LIMIT 1")
+    suspend fun getScalingSettings(): ScalingSettings?
+    
     // Reset to defaults
     @Query("DELETE FROM app_settings WHERE id = 1")
     suspend fun resetToDefaults()
 }
+
+/**
+ * Data class for UI scaling queries
+ */
+data class ScalingSettings(
+    val iconScale: Float,
+    val fontScale: Float
+)
