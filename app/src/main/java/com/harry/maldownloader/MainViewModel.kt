@@ -84,6 +84,13 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private val _appSettings = MutableStateFlow(AppSettings())
     val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
+    // NEW: Icon and Font Scale StateFlows
+    private val _iconScale = MutableStateFlow(1.0f)
+    val iconScale: StateFlow<Float> = _iconScale.asStateFlow()
+
+    private val _fontScale = MutableStateFlow(1.0f)
+    val fontScale: StateFlow<Float> = _fontScale.asStateFlow()
+
     private val animeCustomTags = mutableSetOf<String>()
     private val mangaCustomTags = mutableSetOf<String>()
     private val hentaiCustomTags = mutableSetOf<String>()
@@ -92,6 +99,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         log("🚀 [v${BuildConfig.VERSION_NAME}] MAL Downloader Enhanced - Pictures directory storage enabled")
         loadCustomTags()
         loadSettings()
+        loadScaleSettings()
         storageManager.cleanupTempFiles()
     }
     
@@ -105,6 +113,36 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                 log("⚠️ Could not load settings: ${e.message}")
             }
         }
+    }
+
+    // NEW: Load scale settings from persistent storage
+    private fun loadScaleSettings() {
+        viewModelScope.launch {
+            try {
+                // TODO: Load from DataStore when persistence is implemented
+                _iconScale.value = 1.0f // Default value
+                _fontScale.value = 1.0f // Default value
+                log("🎨 UI Scale loaded - Icon: ${_iconScale.value}, Font: ${_fontScale.value}")
+            } catch (e: Exception) {
+                log("⚠️ Could not load scale settings: ${e.message}")
+            }
+        }
+    }
+
+    // NEW: Set icon scale
+    fun setIconScale(scale: Float) {
+        val clampedScale = scale.coerceIn(0.85f, 1.30f)
+        _iconScale.value = clampedScale
+        log("🎨 Icon scale set to: $clampedScale")
+        // TODO: Persist to DataStore
+    }
+
+    // NEW: Set font scale
+    fun setFontScale(scale: Float) {
+        val clampedScale = scale.coerceIn(0.90f, 1.30f)
+        _fontScale.value = clampedScale
+        log("🎨 Font scale set to: $clampedScale")
+        // TODO: Persist to DataStore
     }
     
     fun updateSetting(key: String, value: Any) {
@@ -124,7 +162,12 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
         log("⚙️ Setting updated: $key = $value")
     }
     
-    fun resetSettingsToDefaults() { _appSettings.value = AppSettings(); log("🔄 Settings reset to defaults") }
+    fun resetSettingsToDefaults() { 
+        _appSettings.value = AppSettings()
+        _iconScale.value = 1.0f
+        _fontScale.value = 1.0f
+        log("🔄 Settings reset to defaults") 
+    }
     
     fun copyLogsToClipboard(context: Context) {
         try {
