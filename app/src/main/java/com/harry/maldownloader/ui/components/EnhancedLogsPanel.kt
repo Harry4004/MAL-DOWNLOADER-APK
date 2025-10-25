@@ -42,77 +42,66 @@ fun EnhancedLogsPanel(
         }
     }
     
-    Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // Compact header with better space utilization
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "📋 Logs (${logs.size})",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            
-            // Compact action buttons
+    Column(modifier = modifier.fillMaxSize()) {
+        // Glass header with actions
+        ModernGlassCard(cornerRadius = 16.dp) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("MAL Logs", logs.joinToString("\n"))
-                        clipboard.setPrimaryClip(clip)
-                        viewModel.log("📋 Logs copied to clipboard (${logs.size} entries)")
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ContentCopy, 
-                        "Copy All",
-                        modifier = Modifier.size(20.dp)
+                Column {
+                    Text(
+                        text = "📋 System Logs",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${logs.size} entries recorded",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
-                IconButton(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, logs.joinToString("\n"))
-                            putExtra(Intent.EXTRA_SUBJECT, "MAL Downloader Logs")
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share Logs"))
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Share, 
-                        "Share",
-                        modifier = Modifier.size(20.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModernIconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("MAL Logs", logs.joinToString("\n"))
+                            clipboard.setPrimaryClip(clip)
+                            viewModel.log("📋 Logs copied to clipboard (${logs.size} entries)")
+                        },
+                        icon = Icons.Default.ContentCopy,
+                        contentDescription = "Copy All"
                     )
-                }
-                
-                IconButton(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete, 
-                        "Clear",
-                        modifier = Modifier.size(20.dp)
+                    
+                    ModernIconButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, logs.joinToString("\n"))
+                                putExtra(Intent.EXTRA_SUBJECT, "MAL Downloader Logs")
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Share Logs"))
+                        },
+                        icon = Icons.Default.Share,
+                        contentDescription = "Share"
+                    )
+                    
+                    ModernIconButton(
+                        onClick = { showClearDialog = true },
+                        icon = Icons.Default.Delete,
+                        contentDescription = "Clear"
                     )
                 }
             }
         }
         
-        // Compact filter chips using LazyRow for better space usage
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Filter chips
         LazyRow(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val filters = listOf("ALL", "ERROR", "WARN", "INFO")
@@ -126,12 +115,7 @@ fun EnhancedLogsPanel(
                 FilterChip(
                     selected = logFilter == filter,
                     onClick = { logFilter = filter },
-                    label = {
-                        Text(
-                            "$filter ($count)",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    },
+                    label = { Text("$filter ($count)", style = MaterialTheme.typography.labelSmall) },
                     modifier = Modifier.height(32.dp)
                 )
             }
@@ -139,15 +123,16 @@ fun EnhancedLogsPanel(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Optimized log display - use more vertical space
+        // Logs display
         if (logs.isEmpty()) {
-            Box(
+            ModernGlassCard(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                cornerRadius = 16.dp
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = "📝",
@@ -170,11 +155,8 @@ fun EnhancedLogsPanel(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    horizontal = 16.dp,
-                    vertical = 8.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 val filteredLogs = when (logFilter) {
                     "ERROR" -> logs.filter { it.contains("❌") || it.contains("💥") }
@@ -184,7 +166,7 @@ fun EnhancedLogsPanel(
                 }
                 
                 items(filteredLogs) { logEntry ->
-                    CompactLogCard(logEntry = logEntry)
+                    ModernLogCard(logEntry = logEntry)
                 }
             }
         }
@@ -192,73 +174,56 @@ fun EnhancedLogsPanel(
     
     // Clear confirmation dialog
     if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { 
-                Text(
-                    "Clear Logs?",
-                    style = MaterialTheme.typography.titleMedium
-                ) 
-            },
-            text = { 
-                Text(
-                    "This will remove all ${logs.size} log entries. This action cannot be undone.",
-                    style = MaterialTheme.typography.bodyMedium
-                ) 
-            },
-            confirmButton = {
-                TextButton(
+        ModernSwipeDialog(
+            onDismiss = { showClearDialog = false },
+            title = "Clear All Logs?",
+            subtitle = "This will remove all ${logs.size} log entries. This action cannot be undone."
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ModernButton(
+                    onClick = { showClearDialog = false },
+                    text = "Cancel",
+                    variant = ModernButtonVariant.Tertiary,
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Close
+                )
+                ModernButton(
                     onClick = {
                         viewModel.clearLogs()
                         showClearDialog = false
-                    }
-                ) {
-                    Text("Clear")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
-                }
+                    },
+                    text = "Clear",
+                    icon = Icons.Default.Delete,
+                    modifier = Modifier.weight(1f)
+                )
             }
-        )
+        }
     }
 }
 
 @Composable
-fun CompactLogCard(logEntry: String) {
-    // More compact log card design
-    Card(
+fun ModernLogCard(logEntry: String) {
+    ModernGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                logEntry.contains("❌") || logEntry.contains("💥") -> 
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-                logEntry.contains("⚠️") -> 
-                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
-                logEntry.contains("✅") -> 
-                    Color(0xFF4CAF50).copy(alpha = 0.08f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            }
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        cornerRadius = 10.dp,
+        elevation = 4.dp,
+        glowIntensity = 0.05f
     ) {
         Text(
             text = logEntry,
-            modifier = Modifier.padding(
-                horizontal = 12.dp, 
-                vertical = 8.dp
-            ),
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace
             ),
             color = when {
                 logEntry.contains("❌") || logEntry.contains("💥") -> 
                     MaterialTheme.colorScheme.error
-                logEntry.contains("⚠️") -> 
+                logEntry.contains("⚠️") || logEntry.contains("🔶") -> 
                     MaterialTheme.colorScheme.tertiary
-                logEntry.contains("✅") -> 
-                    Color(0xFF4CAF50)
+                logEntry.contains("✅") || logEntry.contains("📊") -> 
+                    Color(0xFF34C759)
                 else -> MaterialTheme.colorScheme.onSurface
             },
             lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.2
