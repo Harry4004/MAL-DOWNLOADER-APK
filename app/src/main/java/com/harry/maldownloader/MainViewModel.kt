@@ -17,13 +17,16 @@ import com.harry.maldownloader.data.AnimeEntry
 import com.harry.maldownloader.data.AppSettings
 import com.harry.maldownloader.data.DownloadItem
 import com.harry.maldownloader.data.DownloadRepository
+import com.harry.maldownloader.data.SettingsRepository
 import com.harry.maldownloader.utils.StorageManager
 import com.harry.maldownloader.utils.AppBuildInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -34,8 +37,14 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import dagger.hilt.android.lifecycle.HiltViewModel
 
-class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val repository: DownloadRepository,
+    private val settingsRepository: SettingsRepository
+) : ViewModel() {
 
     private val malApi by lazy {
         ApiClients.malRetrofit { MainApplication.MAL_CLIENT_ID }.create<MalApiService>()
@@ -81,15 +90,28 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     private val _downloadProgress = MutableStateFlow<Map<Int, Float>>(emptyMap())
     val downloadProgress: StateFlow<Map<Int, Float>> = _downloadProgress.asStateFlow()
     
-    private val _appSettings = MutableStateFlow(AppSettings())
-    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+    // Repository-backed settings flow
+    val appSettings: StateFlow<AppSettings> = settingsRepository.settingsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AppSettings()
+        )
 
-    // NEW: Icon and Font Scale StateFlows
-    private val _iconScale = MutableStateFlow(1.0f)
-    val iconScale: StateFlow<Float> = _iconScale.asStateFlow()
-
-    private val _fontScale = MutableStateFlow(1.0f)
-    val fontScale: StateFlow<Float> = _fontScale.asStateFlow()
+    // Repository-backed scaling flows with persistent storage
+    val iconScale: StateFlow<Float> = settingsRepository.iconScaleFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 1.0f
+        )
+        
+    val fontScale: StateFlow<Float> = settingsRepository.fontScaleFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 1.0f
+        )
 
     private val animeCustomTags = mutableSetOf<String>()
     private val mangaCustomTags = mutableSetOf<String>()
@@ -98,75 +120,105 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     init {
         log("🚀 [v${BuildConfig.VERSION_NAME}] MAL Downloader Enhanced - Pictures directory storage enabled")
         loadCustomTags()
-        loadSettings()
-        loadScaleSettings()
+        initializeSettings()
         storageManager.cleanupTempFiles()
     }
     
-    private fun loadSettings() {
+    private fun initializeSettings() {
         viewModelScope.launch {
             try {
-                val settings = AppSettings()
-                _appSettings.value = settings
-                log("🔧 Settings loaded: ${settings.maxConcurrentDownloads} concurrent downloads")
+                settingsRepository.initializeSettings()
+                log("🔧 Settings repository initialized with persistent UI scaling")
             } catch (e: Exception) {
-                log("⚠️ Could not load settings: ${e.message}")
+                log("⚠️ Settings initialization failed: ${e.message}")
             }
         }
     }
 
-    // NEW: Load scale settings from persistent storage
-    private fun loadScaleSettings() {
-        viewModelScope.launch {
-            try {
-                // TODO: Load from DataStore when persistence is implemented
-                _iconScale.value = 1.0f // Default value
-                _fontScale.value = 1.0f // Default value
-                log("🎨 UI Scale loaded - Icon: ${_iconScale.value}, Font: ${_fontScale.value}")
-            } catch (e: Exception) {
-                log("⚠️ Could not load scale settings: ${e.message}")
-            }
-        }
-    }
-
-    // NEW: Set icon scale
+    /**
+     * Set icon scale with validation and persistence
+     */
     fun setIconScale(scale: Float) {
-        val clampedScale = scale.coerceIn(0.85f, 1.30f)
-        _iconScale.value = clampedScale
-        log("🎨 Icon scale set to: $clampedScale")
-        // TODO: Persist to DataStore
+        viewModelScope.launch {
+            try {
+                settingsRepository.updateIconScale(scale)
+                log("🎨 Icon scale updated to: $scale (persisted)")
+            } catch (e: Exception) {
+                log("❌ Failed to update icon scale: ${e.message}")
+            }
+        }
     }
 
-    // NEW: Set font scale
+    /**
+     * Set font scale with validation and persistence
+     */
     fun setFontScale(scale: Float) {
-        val clampedScale = scale.coerceIn(0.90f, 1.30f)
-        _fontScale.value = clampedScale
-        log("🎨 Font scale set to: $clampedScale")
-        // TODO: Persist to DataStore
+        viewModelScope.launch {
+            try {
+                settingsRepository.updateFontScale(scale)
+                log("🎨 Font scale updated to: $scale (persisted)")
+            } catch (e: Exception) {
+                log("❌ Failed to update font scale: ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * Reset scaling settings to defaults
+     */
+    fun resetScaling() {
+        viewModelScope.launch {
+            try {
+                settingsRepository.resetScaling()
+                log("🔄 UI scaling reset to defaults")
+            } catch (e: Exception) {
+                log("❌ Failed to reset scaling: ${e.message}")
+            }
+        }
     }
     
     fun updateSetting(key: String, value: Any) {
-        val current = _appSettings.value
-        val updated = when (key) {
-            "maxConcurrentDownloads" -> current.copy(maxConcurrentDownloads = value as Int)
-            "downloadOnlyOnWifi" -> current.copy(downloadOnlyOnWifi = value as Boolean)
-            "pauseOnLowBattery" -> current.copy(pauseOnLowBattery = value as Boolean)
-            "filenameFormat" -> current.copy(filenameFormat = value as String)
-            "separateAdultContent" -> current.copy(separateAdultContent = value as Boolean)
-            "embedXmpMetadata" -> current.copy(embedXmpMetadata = value as Boolean)
-            "preferMalOverJikan" -> current.copy(preferMalOverJikan = value as Boolean)
-            "enableDetailedLogs" -> current.copy(enableDetailedLogs = value as Boolean)
-            else -> current
+        viewModelScope.launch {
+            try {
+                val current = settingsRepository.getCurrentSettings()
+                val updated = when (key) {
+                    "maxConcurrentDownloads" -> current.copy(maxConcurrentDownloads = value as Int)
+                    "downloadOnlyOnWifi" -> current.copy(downloadOnlyOnWifi = value as Boolean)
+                    "pauseOnLowBattery" -> current.copy(pauseOnLowBattery = value as Boolean)
+                    "filenameFormat" -> current.copy(filenameFormat = value as String)
+                    "separateAdultContent" -> current.copy(separateAdultContent = value as Boolean)
+                    "embedXmpMetadata" -> current.copy(embedXmpMetadata = value as Boolean)
+                    "preferMalOverJikan" -> current.copy(preferMalOverJikan = value as Boolean)
+                    "enableDetailedLogs" -> current.copy(enableDetailedLogs = value as Boolean)
+                    "iconScale" -> {
+                        setIconScale(value as Float)
+                        current
+                    }
+                    "fontScale" -> {
+                        setFontScale(value as Float)
+                        current
+                    }
+                    else -> current
+                }
+                if (key !in listOf("iconScale", "fontScale")) {
+                    settingsRepository.saveSettings(updated)
+                }
+                log("⚙️ Setting updated: $key = $value")
+            } catch (e: Exception) {
+                log("❌ Failed to update setting $key: ${e.message}")
+            }
         }
-        _appSettings.value = updated
-        log("⚙️ Setting updated: $key = $value")
     }
     
-    fun resetSettingsToDefaults() { 
-        _appSettings.value = AppSettings()
-        _iconScale.value = 1.0f
-        _fontScale.value = 1.0f
-        log("🔄 Settings reset to defaults") 
+    fun resetSettingsToDefaults() {
+        viewModelScope.launch {
+            try {
+                settingsRepository.resetAllSettings()
+                log("🔄 All settings reset to defaults")
+            } catch (e: Exception) {
+                log("❌ Failed to reset settings: ${e.message}")
+            }
+        }
     }
     
     fun copyLogsToClipboard(context: Context) {
@@ -278,6 +330,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             if (entries.isEmpty()) { log("❌ No entries found in XML file"); return }
             _animeEntries.value = entries
             var success = 0; var fail = 0; var enrichedCount = 0
+            val settings = appSettings.value
             entries.forEachIndexed { index, entry ->
                 try {
                     log("🔍 Processing ${index + 1}/${entries.size}: ${entry.title}")
@@ -287,7 +340,7 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
                         val list = _animeEntries.value.toMutableList(); val idx = list.indexOfFirst { it.malId == entry.malId }; if (idx != -1) list[idx] = e; _animeEntries.value = list
                         if (downloadToPublicPictures(e)) success++ else fail++
                     }
-                    delay(_appSettings.value.apiDelayMs)
+                    delay(settings.apiDelayMs)
                 } catch (ex: Exception) { log("❌ Processing failed for ${entry.title}: ${ex.message}"); fail++ }
             }
             log("🎉 Processing completed - Success: $success, Failed: $fail, Tags enriched: $enrichedCount")
@@ -295,7 +348,8 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
     }
 
     private suspend fun enrichWithDualApi(entry: AnimeEntry): AnimeEntry? = withContext(Dispatchers.IO) {
-        val preferMal = _appSettings.value.preferMalOverJikan
+        val settings = appSettings.value
+        val preferMal = settings.preferMalOverJikan
         val enriched = if (preferMal) { tryMalApi(entry) ?: tryJikanApi(entry) } else { tryJikanApi(entry) ?: tryMalApi(entry) }
         enriched ?: entry.copy(allTags = listOf("Anime", "MAL-${entry.malId}", entry.type.uppercase()), tags = listOf(entry.type.uppercase()))
     }
@@ -421,7 +475,8 @@ class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
             exif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, entry.title)
             exif.setAttribute(ExifInterface.TAG_SOFTWARE, "MAL-Downloader-v${BuildConfig.VERSION_NAME}")
             exif.setAttribute(ExifInterface.TAG_USER_COMMENT, "MAL ID: ${entry.malId}")
-            if (_appSettings.value.embedXmpMetadata) exif.setAttribute(ExifInterface.TAG_XMP, buildXmpMetadata(entry))
+            val settings = appSettings.value
+            if (settings.embedXmpMetadata) exif.setAttribute(ExifInterface.TAG_XMP, buildXmpMetadata(entry))
             exif.saveAttributes(); log("🏷️ Enhanced metadata embedded (${entry.allTags.size} tags): ${entry.title}")
         } catch (e: Exception) { log("⚠️ Metadata embedding failed: ${e.message}") }
     }
