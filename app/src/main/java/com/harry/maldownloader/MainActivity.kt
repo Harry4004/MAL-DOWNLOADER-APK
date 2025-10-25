@@ -79,10 +79,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaldownloaderTheme {
-                when {
-                    criticalError.value != null -> ErrorScreen(error = criticalError.value!!)
-                    !isInitialized.value -> LoadingScreen()
-                    else -> SafeMainScreen(viewModel = viewModel)
+                // Set up global Snackbar host for error messages
+                val snackbarHostState = rememberGlobalSnackbar()
+                
+                Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
+                ) { scaffoldPadding ->
+                    Box(modifier = Modifier.padding(scaffoldPadding)) {
+                        when {
+                            criticalError.value != null -> ErrorScreen(error = criticalError.value!!)
+                            !isInitialized.value -> LoadingScreen()
+                            else -> SafeMainScreen(viewModel = viewModel)
+                        }
+                    }
                 }
             }
         }
@@ -314,7 +323,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             scope.launch { viewModel.downloadImages(entry) }
                         }
                         2 -> EnhancedDownloadsTab(viewModel = viewModel, downloads = downloads)
-                        3 -> EnhancedLogsPanel(viewModel = viewModel, modifier = Modifier.fillMaxSize())
+                        3 -> EnhancedLogsPanel(viewModel = viewModel, modifier = Modifier.fillSize())
                     }
                 }
             }
