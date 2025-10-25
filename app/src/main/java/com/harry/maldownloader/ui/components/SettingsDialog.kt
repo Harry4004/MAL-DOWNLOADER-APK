@@ -20,6 +20,8 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val appSettings by viewModel.appSettings.collectAsState()
+    val iconScale by viewModel.iconScale.collectAsState()
+    val fontScale by viewModel.fontScale.collectAsState()
     
     ModernSwipeDialog(
         onDismiss = onDismiss,
@@ -33,6 +35,77 @@ fun SettingsDialog(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // NEW: UI Scaling Settings Section
+            ModernGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                glowIntensity = 0.1f
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.ZoomIn,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "UI Scale Settings",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Icon size slider
+                Column {
+                    Text(
+                        text = "Icon Size: ${String.format("%.0f", iconScale * 100)}%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Adjust icon size throughout the app",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = iconScale,
+                        onValueChange = { viewModel.setIconScale(it) },
+                        valueRange = 0.85f..1.30f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Font size slider
+                Column {
+                    Text(
+                        text = "Font Size: ${String.format("%.0f", fontScale * 100)}%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Adjust text size throughout the app",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = fontScale,
+                        onValueChange = { viewModel.setFontScale(it) },
+                        valueRange = 0.90f..1.30f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            
             // Download Settings Section
             ModernGlassCard(
                 modifier = Modifier.fillMaxWidth(),
