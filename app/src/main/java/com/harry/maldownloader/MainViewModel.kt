@@ -359,15 +359,71 @@ class MainViewModel @Inject constructor(
         null // Placeholder until MAL client usage is configured
     } catch (e: Exception) { log("⚠️ MAL API failed for ${entry.title}: ${e.message}"); null }
 
-    private suspend fun tryJikanApi(entry: AnimeEntry): AnimeEntry? = runCatching {
+    private suspend fun tryJikanApi(entry: AnimeEntry): AnimeEntry? {
         log("🌐 Attempting Jikan API enrichment for: ${entry.title}")
-        when (entry.type) { "anime" -> jikanApi.getAnimeFull(entry.malId); "manga" -> jikanApi.getMangaFull(entry.malId); else -> null }
-    }.getOrNull()?.let { resp ->
-        if (resp.isSuccessful) when (entry.type) {
-            "anime" -> { @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>; r.body()?.data?.let { enrichAnimeEntry(entry, it) } }
-            "manga" -> { @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<MangaResponse>; r.body()?.data?.let { enrichMangaEntry(entry, it) } }
-            else -> null
-        } else { log("❌ Jikan API response failed: ${resp.code()}"); null }
+        // First, try the full endpoint
+        val primary = runCatching {
+            when (entry.type) {
+                "anime" -> jikanApi.getAnimeFull(entry.malId)
+                "manga" -> jikanApi.getMangaFull(entry.malId)
+                else -> null
+            }
+        }.getOrNull()
+
+        primary?.let { resp ->
+            if (resp.isSuccessful) {
+                return when (entry.type) {
+                    "anime" -> {
+                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
+                        r.body()?.data?.let { enrichAnimeEntry(entry, it) }
+                    }
+                    "manga" -> {
+                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<MangaResponse>
+                        r.body()?.data?.let { enrichMangaEntry(entry, it) }
+                    }
+                    else -> null
+                }
+            } else {
+                val code = resp.code()
+                val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
+                log("❌ Jikan full endpoint failed: HTTP $code ${err ?: ""}".trim())
+            }
+        }
+
+        // Fallback to lightweight endpoint
+        val fallback = runCatching {
+            when (entry.type) {
+                "anime" -> jikanApi.getAnime(entry.malId)
+                "manga" -> jikanApi.getManga(entry.malId)
+                else -> null
+            }
+        }.getOrNull()
+
+        fallback?.let { resp ->
+            if (resp.isSuccessful) {
+                return when (entry.type) {
+                    "anime" -> {
+                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
+                        r.body()?.data?.let { enrichAnimeEntry(entry, it) }
+                    }
+                    "manga" -> {
+                        @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<MangaResponse>
+                        r.body()?.data?.let { enrichMangaEntry(entry, it) }
+                    }
+                    else -> null
+                }
+            } else {
+                val code = resp.code()
+                val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
+                log("❌ Jikan fallback endpoint failed: HTTP $code ${err ?: ""}".trim())
+            }
+        }
+
+        // If still null, return minimal tags
+        return entry.copy(
+            allTags = listOf("${entry.type.replaceFirstChar { it.uppercase() }}", "MAL-${entry.malId}"),
+            tags = listOf(entry.type.uppercase())
+        )
     }
 
     private fun enrichAnimeEntry(entry: AnimeEntry, data: AnimeData): AnimeEntry {
@@ -481,8 +537,39 @@ class MainViewModel @Inject constructor(
         } catch (e: Exception) { log("⚠️ Metadata embedding failed: ${e.message}") }
     }
 
-    private fun buildXmpMetadata(entry: AnimeEntry): String = buildString {
-        appendLine("<x:xmpmeta xmlns:x='adobe:ns:meta/'>"); appendLine("  <rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>"); appendLine("    <rdf:Description rdf:about=''>"); appendLine("      <dc:title>${entry.title}</dc:title>"); appendLine("      <dc:description>${entry.synopsis ?: "MAL Entry"}</dc:description>"); appendLine("      <dc:subject>"); appendLine("        <rdf:Bag>"); entry.allTags.take(20).forEach { tag -> appendLine("          <rdf:li>$tag</rdf:li>") }; appendLine("        </rdf:Bag>"); appendLine("      </dc:subject>"); appendLine("    </rdf:Description>"); appendLine("  </rdf:RDF>"); appendLine("</x:xmpmeta>")
+    private fun xmlEscape(s: String): String = s
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+
+    private fun buildXmpMetadata(entry: AnimeEntry): String {
+        val title = xmlEscape(entry.title)
+        val descriptionRaw = entry.synopsis?.take(2000) ?: "MAL Entry"
+        val description = xmlEscape(descriptionRaw)
+        val cleanTags = entry.allTags
+            .map { it.trim().replace(Regex("\\p{Cntrl}"), "") }
+            .distinct()
+            .take(20)
+            .map { xmlEscape(it) }
+
+        val li = cleanTags.joinToString("\n") { "          <rdf:li>$it</rdf:li>" }
+        return """
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <rdf:Description rdf:about="">
+      <dc:title>$title</dc:title>
+      <dc:description>$description</dc:description>
+      <dc:subject>
+        <rdf:Bag>
+$li
+        </rdf:Bag>
+      </dc:subject>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+""".trimIndent()
     }
 
     private fun recordDownload(entry: AnimeEntry, url: String, path: String?, status: String, error: String? = null) {
