@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -41,11 +42,14 @@ import androidx.lifecycle.ViewModelProvider
 import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.ui.components.*
 import com.harry.maldownloader.ui.theme.MaldownloaderTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private lateinit var viewModel: MainViewModel
-    private lateinit var repository: DownloadRepository
+    // Use Hilt to inject the ViewModel
+    private val viewModel: MainViewModel by viewModels()
+    
     private val criticalError = mutableStateOf<Throwable?>(null)
     private val isInitialized = mutableStateOf(false)
     private val permissionRequestInProgress = mutableStateOf(false)
@@ -53,20 +57,18 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         try {
             permissionRequestInProgress.value = false
-            if (::viewModel.isInitialized) {
-                var storageGranted = false
-                var notificationGranted = false
-                permissions.forEach { (permission, granted) ->
-                    when (permission) {
-                        Manifest.permission.POST_NOTIFICATIONS -> notificationGranted = granted
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.READ_MEDIA_IMAGES -> if (granted) storageGranted = true
-                    }
+            var storageGranted = false
+            var notificationGranted = false
+            permissions.forEach { (permission, granted) ->
+                when (permission) {
+                    Manifest.permission.POST_NOTIFICATIONS -> notificationGranted = granted
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_MEDIA_IMAGES -> if (granted) storageGranted = true
                 }
-                viewModel.setNotificationPermission(notificationGranted)
-                viewModel.setStoragePermission(storageGranted)
             }
+            viewModel.setNotificationPermission(notificationGranted)
+            viewModel.setStoragePermission(storageGranted)
         } catch (e: Exception) {
             Log.e("MainActivity", "Error handling permission result", e)
             permissionRequestInProgress.value = false
@@ -89,10 +91,8 @@ class MainActivity : ComponentActivity() {
 
     private fun initializeApp() {
         try {
-            val app = application as MainApplication
-            val database = app.database ?: throw Exception("Database initialization failed")
-            repository = DownloadRepository(context = this, database = database)
-            viewModel = ViewModelProvider(this, MainViewModelFactory(repository))[MainViewModel::class.java]
+            // With Hilt, ViewModel is automatically injected with dependencies
+            // No need to manually create repository or ViewModel
             checkAndRequestPermissions()
             isInitialized.value = true
         } catch (e: Exception) {
@@ -133,12 +133,10 @@ class MainActivity : ComponentActivity() {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        if (::viewModel.isInitialized) {
-            viewModel.setStoragePermission(hasAllStoragePermissions)
-            val hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            viewModel.setNotificationPermission(hasNotificationPermission)
-        }
+        viewModel.setStoragePermission(hasAllStoragePermissions)
+        val hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        viewModel.setNotificationPermission(hasNotificationPermission)
 
         if (permissions.isNotEmpty()) {
             permissionRequestInProgress.value = true
@@ -334,12 +332,4 @@ fun SafeMainScreen(viewModel: MainViewModel) {
     }
 }
 
-class MainViewModelFactory(private val repository: DownloadRepository) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}
+// MainViewModelFactory is no longer needed with Hilt injection
