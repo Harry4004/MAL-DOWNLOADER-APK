@@ -7,10 +7,12 @@ import android.os.Build
 import android.util.Log
 import com.harry.maldownloader.data.DownloadDatabase
 import com.harry.maldownloader.data.DownloadLog
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+@HiltAndroidApp
 class MainApplication : Application() {
     val database by lazy {
         try {
@@ -23,7 +25,7 @@ class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("MainApplication", "Starting application initialization")
+        Log.d("MainApplication", "Starting application initialization with Hilt DI")
         try {
             Thread.setDefaultUncaughtExceptionHandler { t, e ->
                 Log.e("AppCrash", "Fatal crash in thread ${t.name}", e)
