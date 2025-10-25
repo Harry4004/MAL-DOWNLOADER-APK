@@ -49,6 +49,10 @@ data class AppSettings(
     val enableHapticFeedback: Boolean = true,
     val autoScrollLogs: Boolean = true,
     
+    // UI Scaling Configuration
+    val iconScale: Float = 1.0f, // Range: 0.85f - 1.30f
+    val fontScale: Float = 1.0f, // Range: 0.90f - 1.30f
+    
     // Advanced Features
     val enableDuplicateDetection: Boolean = true,
     val checkContentHash: Boolean = false,
@@ -65,6 +69,7 @@ enum class SettingsCategory {
     STORAGE,
     METADATA,
     API,
+    UI, // UI scaling settings category
     ADVANCED,
     ABOUT
 }
@@ -86,6 +91,7 @@ data class SettingItem(
 enum class SettingType {
     BOOLEAN,      // Toggle switch
     INTEGER,      // Number input/slider
+    FLOAT,        // Float slider for scaling
     STRING,       // Text input
     SELECTION     // Dropdown/radio buttons
 }
@@ -201,6 +207,26 @@ object SettingsConfig {
             SettingType.INTEGER,
             1200,
             range = 500 to 5000
+        ),
+        
+        // UI Scaling
+        SettingItem(
+            "iconScale",
+            "Icon Size",
+            "Adjust the size of icons throughout the app",
+            SettingsCategory.UI,
+            SettingType.FLOAT,
+            1.0f,
+            range = 85 to 130 // Stored as percentage for UI
+        ),
+        SettingItem(
+            "fontScale",
+            "Font Size",
+            "Adjust the size of text throughout the app",
+            SettingsCategory.UI,
+            SettingType.FLOAT,
+            1.0f,
+            range = 90 to 130
         )
     )
     
