@@ -356,23 +356,48 @@ class MainViewModel @Inject constructor(
 
     private suspend fun tryMalApi(entry: AnimeEntry): AnimeEntry? = try {
         log("🌐 Attempting MAL API enrichment for: ${entry.title}")
-        null // Placeholder until MAL client usage is configured
-    } catch (e: Exception) { log("⚠️ MAL API failed for ${entry.title}: ${e.message}"); null }
+        val clientId = MainApplication.MAL_CLIENT_ID
+        val enriched = when (entry.type) {
+            "anime" -> malApi.fetchAnimeEnriched(entry.malId, clientId)
+            "manga" -> malApi.fetchMangaEnriched(entry.malId, clientId)
+            else -> null
+        }
+        enriched?.let { (tags, synopsis) ->
+            val merged = entry.copy(
+                synopsis = synopsis ?: entry.synopsis,
+                allTags = (entry.allTags + tags).distinct().sorted(),
+                tags = (entry.tags + tags).distinct().sorted()
+            )
+            log("✅ MAL enrichment successful: ${tags.size} tags added")
+            merged
+        } ?: run {
+            val errorMsg = "MAL API returned empty for ${entry.title}"
+            log("⚠️ $errorMsg")
+            UiBus.errors.tryEmit("MAL API: No data for ${entry.title}")
+            null
+        }
+    } catch (e: Exception) {
+        val errorMsg = "MAL API failed for ${entry.title}: ${e.message}"
+        log("❌ $errorMsg")
+        UiBus.errors.tryEmit("MAL API error: ${entry.title}")
+        null
+    }
 
     private suspend fun tryJikanApi(entry: AnimeEntry): AnimeEntry? {
         log("🌐 Attempting Jikan API enrichment for: ${entry.title}")
-        // First, try the full endpoint
+        
+        // First, try the full endpoint with retry/backoff
         val primary = runCatching {
             when (entry.type) {
-                "anime" -> jikanApi.getAnimeFull(entry.malId)
-                "manga" -> jikanApi.getMangaFull(entry.malId)
+                "anime" -> jikanApi.retryAnimeFull(entry.malId)
+                "manga" -> jikanApi.retryMangaFull(entry.malId)
                 else -> null
             }
         }.getOrNull()
 
         primary?.let { resp ->
             if (resp.isSuccessful) {
-                return when (entry.type) {
+                val result = when (entry.type) {
                     "anime" -> {
                         @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
                         r.body()?.data?.let { enrichAnimeEntry(entry, it) }
@@ -383,10 +408,20 @@ class MainViewModel @Inject constructor(
                     }
                     else -> null
                 }
+                if (result != null) {
+                    log("✅ Jikan full enrichment successful: ${result.allTags.size} tags")
+                    return result
+                }
             } else {
                 val code = resp.code()
                 val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
-                log("❌ Jikan full endpoint failed: HTTP $code ${err ?: ""}".trim())
+                val errorMsg = "Jikan full failed: HTTP $code ${err ?: ""}".trim()
+                log("❌ $errorMsg")
+                if (code == 429) {
+                    UiBus.errors.tryEmit("Jikan rate limited, using fallback")
+                } else {
+                    UiBus.errors.tryEmit("Jikan API: HTTP $code for ${entry.title}")
+                }
             }
         }
 
@@ -401,7 +436,7 @@ class MainViewModel @Inject constructor(
 
         fallback?.let { resp ->
             if (resp.isSuccessful) {
-                return when (entry.type) {
+                val result = when (entry.type) {
                     "anime" -> {
                         @Suppress("UNCHECKED_CAST") val r = resp as retrofit2.Response<AnimeResponse>
                         r.body()?.data?.let { enrichAnimeEntry(entry, it) }
@@ -412,14 +447,22 @@ class MainViewModel @Inject constructor(
                     }
                     else -> null
                 }
+                if (result != null) {
+                    log("✅ Jikan fallback enrichment successful: ${result.allTags.size} tags")
+                    return result
+                }
             } else {
                 val code = resp.code()
                 val err = runCatching { resp.errorBody()?.string() }.getOrNull()?.take(256)
-                log("❌ Jikan fallback endpoint failed: HTTP $code ${err ?: ""}".trim())
+                val errorMsg = "Jikan fallback failed: HTTP $code ${err ?: ""}".trim()
+                log("❌ $errorMsg")
+                UiBus.errors.tryEmit("Jikan fallback: HTTP $code for ${entry.title}")
             }
         }
 
-        // If still null, return minimal tags
+        // Final fallback with minimal tags
+        log("⚠️ Both Jikan endpoints failed for ${entry.title}, using minimal tags")
+        UiBus.errors.tryEmit("No enrichment data for ${entry.title}")
         return entry.copy(
             allTags = listOf("${entry.type.replaceFirstChar { it.uppercase() }}", "MAL-${entry.malId}"),
             tags = listOf(entry.type.uppercase())
@@ -534,7 +577,11 @@ class MainViewModel @Inject constructor(
             val settings = appSettings.value
             if (settings.embedXmpMetadata) exif.setAttribute(ExifInterface.TAG_XMP, buildXmpMetadata(entry))
             exif.saveAttributes(); log("🏷️ Enhanced metadata embedded (${entry.allTags.size} tags): ${entry.title}")
-        } catch (e: Exception) { log("⚠️ Metadata embedding failed: ${e.message}") }
+        } catch (e: Exception) { 
+            val errorMsg = "Metadata embedding failed for ${entry.title}: ${e.message}"
+            log("⚠️ $errorMsg")
+            // Don't surface XMP errors to user unless critical
+        }
     }
 
     private fun xmlEscape(s: String): String = s
