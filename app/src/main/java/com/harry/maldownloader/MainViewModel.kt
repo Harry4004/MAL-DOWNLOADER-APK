@@ -20,6 +20,7 @@ import com.harry.maldownloader.data.DownloadRepository
 import com.harry.maldownloader.data.SettingsRepository
 import com.harry.maldownloader.utils.StorageManager
 import com.harry.maldownloader.utils.AppBuildInfo
+import com.harry.maldownloader.utils.UiBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -326,7 +327,7 @@ class MainViewModel @Inject constructor(
             log("🚀 [v${BuildConfig.VERSION_NAME}] Enhanced MAL processing started with dual-API tag enrichment")
             if (!storageManager.isExternalStorageWritable()) { log("❌ External storage not available"); return }
             val entries = withContext(Dispatchers.IO) { parseMalXml(context, uri) }
-            log("📝 Successfully parsed ${entries.size} entries from MAL XML")
+            log("📋 Successfully parsed ${entries.size} entries from MAL XML")
             if (entries.isEmpty()) { log("❌ No entries found in XML file"); return }
             _animeEntries.value = entries
             var success = 0; var fail = 0; var enrichedCount = 0
@@ -357,7 +358,7 @@ class MainViewModel @Inject constructor(
     private suspend fun tryMalApi(entry: AnimeEntry): AnimeEntry? = try {
         log("🌐 Attempting MAL API enrichment for: ${entry.title}")
         val clientId = MainApplication.MAL_CLIENT_ID
-        val enriched = when (entry.type) {
+        val enriched: Pair<List<String>, String?>? = when (entry.type) {
             "anime" -> malApi.fetchAnimeEnriched(entry.malId, clientId)
             "manga" -> malApi.fetchMangaEnriched(entry.malId, clientId)
             else -> null
@@ -398,12 +399,10 @@ class MainViewModel @Inject constructor(
                 if (resp.isSuccessful) {
                     return when (entry.type) {
                         "anime" -> {
-                            @Suppress("UNCHECKED_CAST")
                             val animeResp = resp as retrofit2.Response<AnimeResponse>
                             animeResp.body()?.data?.let { enrichAnimeEntry(entry, it) }
                         }
                         "manga" -> {
-                            @Suppress("UNCHECKED_CAST")
                             val mangaResp = resp as retrofit2.Response<MangaResponse>
                             mangaResp.body()?.data?.let { enrichMangaEntry(entry, it) }
                         }
@@ -439,12 +438,10 @@ class MainViewModel @Inject constructor(
                 if (resp.isSuccessful) {
                     return when (entry.type) {
                         "anime" -> {
-                            @Suppress("UNCHECKED_CAST")
                             val animeResp = resp as retrofit2.Response<AnimeResponse>
                             animeResp.body()?.data?.let { enrichAnimeEntry(entry, it) }
                         }
                         "manga" -> {
-                            @Suppress("UNCHECKED_CAST")
                             val mangaResp = resp as retrofit2.Response<MangaResponse>
                             mangaResp.body()?.data?.let { enrichMangaEntry(entry, it) }
                         }
