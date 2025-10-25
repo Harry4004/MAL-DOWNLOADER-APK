@@ -323,7 +323,7 @@ fun SafeMainScreen(viewModel: MainViewModel) {
                             scope.launch { viewModel.downloadImages(entry) }
                         }
                         2 -> EnhancedDownloadsTab(viewModel = viewModel, downloads = downloads)
-                        3 -> EnhancedLogsPanel(viewModel = viewModel, modifier = Modifier.fillSize())
+                        3 -> EnhancedLogsPanel(viewModel = viewModel, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
