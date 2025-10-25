@@ -11,8 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.harry.maldownloader.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,313 +21,332 @@ fun SettingsDialog(
 ) {
     val appSettings by viewModel.appSettings.collectAsState()
     
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false
-        )
+    ModernSwipeDialog(
+        onDismiss = onDismiss,
+        title = "🔧 Application Settings",
+        subtitle = "Configure app behavior and preferences",
+        showSwipeIndicator = true
     ) {
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
+            // Download Settings Section
+            ModernGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                glowIntensity = 0.1f
             ) {
-                // Header - preserve SettingsScreen functionality
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "🔧 Settings",
+                        text = "Download Settings",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Close Settings")
-                    }
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                // Download Settings Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                // Max concurrent downloads
+                Column {
+                    Text(
+                        text = "Concurrent Downloads: ${appSettings.maxConcurrentDownloads}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
                     )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "⬇️ Download Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Max concurrent downloads
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Concurrent Downloads: ${appSettings.maxConcurrentDownloads}")
-                            Slider(
-                                value = appSettings.maxConcurrentDownloads.toFloat(),
-                                onValueChange = { 
-                                    viewModel.updateSetting("maxConcurrentDownloads", it.toInt())
-                                },
-                                valueRange = 1f..5f,
-                                steps = 3,
-                                modifier = Modifier.width(120.dp)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // Wi-Fi only toggle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Download only on Wi-Fi")
-                            Switch(
-                                checked = appSettings.downloadOnlyOnWifi,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("downloadOnlyOnWifi", it)
-                                }
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // Pause on low battery
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Pause on low battery")
-                            Switch(
-                                checked = appSettings.pauseOnLowBattery,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("pauseOnLowBattery", it)
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Storage Settings Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    Text(
+                        text = "Number of simultaneous downloads (1-5)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "📁 Storage Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Separate adult content
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("Separate adult content")
-                                Text(
-                                    text = "Organize 18+ content in separate folders",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = appSettings.separateAdultContent,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("separateAdultContent", it)
-                                }
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Filename format selector
-                        Text(
-                            text = "Filename Format: ${appSettings.filenameFormat}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val formats = listOf(
-                                "{title}_{id}.{ext}" to "Title_ID",
-                                "{id}_{title}.{ext}" to "ID_Title",
-                                "{title}.{ext}" to "Title Only"
-                            )
-                            formats.forEach { (format, display) ->
-                                FilterChip(
-                                    selected = appSettings.filenameFormat == format,
-                                    onClick = { 
-                                        viewModel.updateSetting("filenameFormat", format)
-                                    },
-                                    label = { Text(display, style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Metadata Settings Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "🏷️ Metadata Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // XMP metadata embedding
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("Embed XMP metadata")
-                                Text(
-                                    text = "Add tags to images for AVES Gallery",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = appSettings.embedXmpMetadata,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("embedXmpMetadata", it)
-                                }
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        // API preference
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("Prefer MAL over Jikan")
-                                Text(
-                                    text = "Use official MAL API first for tags",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = appSettings.preferMalOverJikan,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("preferMalOverJikan", it)
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Advanced Settings Section
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "🔧 Advanced Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Detailed logging
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Enable detailed logging")
-                            Switch(
-                                checked = appSettings.enableDetailedLogs,
-                                onCheckedChange = { 
-                                    viewModel.updateSetting("enableDetailedLogs", it)
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            // Reset to defaults
-                            viewModel.resetSettingsToDefaults()
-                            viewModel.log("🔄 Settings reset to defaults")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = appSettings.maxConcurrentDownloads.toFloat(),
+                        onValueChange = { 
+                            viewModel.updateSetting("maxConcurrentDownloads", it.toInt())
                         },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Reset")
-                    }
+                        valueRange = 1f..5f,
+                        steps = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Wi-Fi only toggle
+                ModernSettingsToggle(
+                    title = "Download only on Wi-Fi",
+                    subtitle = "Prevent mobile data usage",
+                    checked = appSettings.downloadOnlyOnWifi,
+                    onCheckedChange = { viewModel.updateSetting("downloadOnlyOnWifi", it) },
+                    icon = Icons.Default.Wifi
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Pause on low battery
+                ModernSettingsToggle(
+                    title = "Pause on low battery",
+                    subtitle = "Preserve battery when low",
+                    checked = appSettings.pauseOnLowBattery,
+                    onCheckedChange = { viewModel.updateSetting("pauseOnLowBattery", it) },
+                    icon = Icons.Default.BatteryAlert
+                )
+            }
+            
+            // Storage Settings Section
+            ModernGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                glowIntensity = 0.1f
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Storage Settings",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Separate adult content
+                ModernSettingsToggle(
+                    title = "Separate adult content",
+                    subtitle = "Organize 18+ content in separate folders",
+                    checked = appSettings.separateAdultContent,
+                    onCheckedChange = { viewModel.updateSetting("separateAdultContent", it) },
+                    icon = Icons.Default.FolderSpecial
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Filename format selector
+                Column {
+                    Text(
+                        text = "Filename Format",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Current: ${appSettings.filenameFormat}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                     
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Done")
+                        val formats = listOf(
+                            "{title}_{id}.{ext}" to "Title_ID",
+                            "{id}_{title}.{ext}" to "ID_Title",
+                            "{title}.{ext}" to "Title Only"
+                        )
+                        formats.forEach { (format, display) ->
+                            FilterChip(
+                                selected = appSettings.filenameFormat == format,
+                                onClick = { 
+                                    viewModel.updateSetting("filenameFormat", format)
+                                },
+                                label = { 
+                                    Text(
+                                        display, 
+                                        style = MaterialTheme.typography.labelSmall
+                                    ) 
+                                }
+                            )
+                        }
                     }
                 }
             }
+            
+            // Metadata Settings Section
+            ModernGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                glowIntensity = 0.1f
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Tag,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Metadata Settings",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // XMP metadata embedding
+                ModernSettingsToggle(
+                    title = "Embed XMP metadata",
+                    subtitle = "Add tags to images for AVES Gallery",
+                    checked = appSettings.embedXmpMetadata,
+                    onCheckedChange = { viewModel.updateSetting("embedXmpMetadata", it) },
+                    icon = Icons.Default.PhotoLibrary
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // API preference
+                ModernSettingsToggle(
+                    title = "Prefer MAL over Jikan",
+                    subtitle = "Use official MAL API first for tags",
+                    checked = appSettings.preferMalOverJikan,
+                    onCheckedChange = { viewModel.updateSetting("preferMalOverJikan", it) },
+                    icon = Icons.Default.Api
+                )
+            }
+            
+            // Advanced Settings Section
+            ModernGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                glowIntensity = 0.1f
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Advanced Settings",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Detailed logging
+                ModernSettingsToggle(
+                    title = "Enable detailed logging",
+                    subtitle = "More verbose logs for debugging",
+                    checked = appSettings.enableDetailedLogs,
+                    onCheckedChange = { viewModel.updateSetting("enableDetailedLogs", it) },
+                    icon = Icons.Default.BugReport
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ModernButton(
+                onClick = {
+                    viewModel.resetSettingsToDefaults()
+                    viewModel.log("🔄 Settings reset to defaults")
+                },
+                text = "Reset",
+                modifier = Modifier.weight(1f),
+                variant = ModernButtonVariant.Tertiary,
+                icon = Icons.Default.RestartAlt
+            )
+            
+            ModernButton(
+                onClick = onDismiss,
+                text = "Done",
+                modifier = Modifier.weight(1f),
+                variant = ModernButtonVariant.Primary,
+                icon = Icons.Default.Check
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernSettingsToggle(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
         }
     }
 }
