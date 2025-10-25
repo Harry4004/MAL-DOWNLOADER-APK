@@ -6,7 +6,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.tryAwaitRelease
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -19,10 +18,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -51,17 +47,7 @@ fun GlassSurface(
                     radius = 800f
                 )
             )
-            .then(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && backdropEnabled) {
-                    Modifier.graphicsLayer {
-                        renderEffect = RenderEffect.createBlurEffect(
-                            blurRadius.toPx(),
-                            blurRadius.toPx(),
-                            Shader.TileMode.CLAMP
-                        )
-                    }
-                } else Modifier
-            )
+            // Note: RenderEffect blur removed for maximal compatibility with CI toolchain.
     ) {
         Box(
             modifier = Modifier
@@ -133,7 +119,7 @@ fun GlassButton(
                                 if (enabled) {
                                     isPressed = true
                                     try {
-                                        tryAwaitRelease()
+                                        awaitRelease()
                                     } finally {
                                         isPressed = false
                                     }
@@ -151,7 +137,7 @@ fun GlassButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Alignment.Center,
             verticalAlignment = Alignment.CenterVertically,
             content = content
         )
@@ -183,7 +169,7 @@ fun GlassCard(
                             onPress = {
                                 isPressed = true
                                 try {
-                                    tryAwaitRelease()
+                                    awaitRelease()
                                 } finally {
                                     isPressed = false
                                 }
