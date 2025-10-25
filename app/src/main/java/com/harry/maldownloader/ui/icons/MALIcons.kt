@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 /**
  * MAL Downloader Custom Icon Pack
  * Professional vector icons designed for the app's visual identity
+ * Enhanced with additional icons for comprehensive UI coverage
  */
 object MALIcons {
     
@@ -158,12 +159,6 @@ object MALIcons {
                 lineTo(12f, 16f)
                 lineTo(19f, 9f)
                 close()
-                moveTo(12f, 4f)
-                curveTo(13.1f, 4f, 14f, 4.9f, 14f, 6f)
-                curveTo(14f, 7.1f, 13.1f, 8f, 12f, 8f)
-                curveTo(10.9f, 8f, 10f, 7.1f, 10f, 6f)
-                curveTo(10f, 4.9f, 10.9f, 4f, 12f, 4f)
-                close()
             }
         }.build()
 
@@ -221,6 +216,53 @@ object MALIcons {
                 lineTo(14f, 15f)
                 lineTo(8f, 15f)
                 lineTo(8f, 13f)
+                close()
+            }
+        }.build()
+
+    // Enhanced App icon with better design
+    val App: ImageVector
+        get() = ImageVector.Builder(
+            name = "App",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(12f, 2f)
+                curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+                curveTo(2f, 17.52f, 6.48f, 22f, 12f, 22f)
+                curveTo(17.52f, 22f, 22f, 17.52f, 22f, 12f)
+                curveTo(22f, 6.48f, 17.52f, 2f, 12f, 2f)
+                close()
+                moveTo(12f, 20f)
+                curveTo(7.59f, 20f, 4f, 16.41f, 4f, 12f)
+                curveTo(4f, 7.59f, 7.59f, 4f, 12f, 4f)
+                curveTo(16.41f, 4f, 20f, 7.59f, 20f, 12f)
+                curveTo(20f, 16.41f, 16.41f, 20f, 12f, 20f)
+                close()
+                moveTo(10f, 8f)
+                lineTo(10f, 16f)
+                lineTo(12f, 16f)
+                lineTo(12f, 10f)
+                lineTo(14f, 10f)
+                lineTo(14f, 16f)
+                lineTo(16f, 16f)
+                lineTo(16f, 8f)
+                lineTo(14f, 8f)
+                lineTo(12f, 8f)
+                lineTo(10f, 8f)
                 close()
             }
         }.build()
@@ -415,24 +457,6 @@ object MALIcons {
                 lineTo(5f, 6f)
                 lineTo(19f, 6f)
                 lineTo(19f, 4f)
-                close()
-                moveTo(10f, 9f)
-                lineTo(10f, 17f)
-                lineTo(8f, 17f)
-                lineTo(8f, 9f)
-                lineTo(10f, 9f)
-                close()
-                moveTo(14f, 9f)
-                lineTo(14f, 17f)
-                lineTo(12f, 17f)
-                lineTo(12f, 9f)
-                lineTo(14f, 9f)
-                close()
-                moveTo(16f, 9f)
-                lineTo(16f, 17f)
-                lineTo(14.5f, 17f)
-                lineTo(14.5f, 9f)
-                lineTo(16f, 9f)
                 close()
             }
         }.build()
@@ -745,61 +769,6 @@ object MALIcons {
                 lineTo(11f, 7f)
                 lineTo(13f, 7f)
                 lineTo(13f, 13f)
-                close()
-            }
-        }.build()
-
-    val App: ImageVector
-        get() = ImageVector.Builder(
-            name = "App",
-            defaultWidth = 24.dp,
-            defaultHeight = 24.dp,
-            viewportWidth = 24f,
-            viewportHeight = 24f
-        ).apply {
-            path(
-                fill = SolidColor(Color.Black),
-                fillAlpha = 1.0f,
-                stroke = null,
-                strokeAlpha = 1.0f,
-                strokeLineWidth = 1.0f,
-                strokeLineCap = StrokeCap.Butt,
-                strokeLineJoin = StrokeJoin.Miter,
-                strokeLineMiter = 1.0f,
-                pathFillType = PathFillType.NonZero
-            ) {
-                moveTo(12f, 3f)
-                curveTo(7.58f, 3f, 4f, 6.58f, 4f, 11f)
-                curveTo(4f, 15.42f, 7.58f, 19f, 12f, 19f)
-                curveTo(16.42f, 19f, 20f, 15.42f, 20f, 11f)
-                curveTo(20f, 6.58f, 16.42f, 3f, 12f, 3f)
-                close()
-                moveTo(12f, 17f)
-                curveTo(8.69f, 17f, 6f, 14.31f, 6f, 11f)
-                curveTo(6f, 7.69f, 8.69f, 5f, 12f, 5f)
-                curveTo(15.31f, 5f, 18f, 7.69f, 18f, 11f)
-                curveTo(18f, 14.31f, 15.31f, 17f, 12f, 17f)
-                close()
-                moveTo(9f, 8f)
-                lineTo(9f, 14f)
-                lineTo(11f, 14f)
-                lineTo(11f, 10f)
-                lineTo(13f, 10f)
-                lineTo(13f, 14f)
-                lineTo(15f, 14f)
-                lineTo(15f, 8f)
-                lineTo(13f, 8f)
-                lineTo(13f, 9f)
-                lineTo(11f, 9f)
-                lineTo(11f, 8f)
-                lineTo(9f, 8f)
-                close()
-                moveTo(12f, 20f)
-                lineTo(20f, 20f)
-                lineTo(20f, 22f)
-                lineTo(4f, 22f)
-                lineTo(4f, 20f)
-                lineTo(12f, 20f)
                 close()
             }
         }.build()
