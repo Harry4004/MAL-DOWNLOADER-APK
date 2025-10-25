@@ -1,171 +1,199 @@
-// GlassPrimitives.kt - Fully Updated Version
-// Includes blur effects, gestures, and new composables used in LiquidGlass components.
 package com.harry.maldownloader.ui.components
 
 import android.os.Build
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.tryAwaitRelease
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.*
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.Shader.TileMode
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
-// Creates a blurred glass-like surface effect
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    tintColor: Color = Color.White.copy(alpha = 0.1f),
-    surfaceAlpha: Float = 0.2f,
-    cornerRadius: Dp = 16.dp,
-    backdropEnabled: Boolean = false,
+    cornerRadius: Dp = 20.dp,
+    surfaceAlpha: Float = 0.12f,
+    borderAlpha: Float = 0.25f,
+    highlightStrength: Float = 0.15f,
+    blurRadius: Dp = 20.dp,
+    tintColor: Color = Color.White,
+    backdropEnabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val radiusPx = with(LocalDensity.current) { cornerRadius.toPx() }
     Box(
         modifier = modifier
-            .graphicsLayer {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    renderEffect = RenderEffect.createBlurEffect(60f, 60f, TileMode.CLAMP)
-                }
-            }
             .clip(RoundedCornerShape(cornerRadius))
-            .background(tintColor.copy(alpha = surfaceAlpha))
-            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(cornerRadius))
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        tintColor.copy(alpha = surfaceAlpha + highlightStrength),
+                        tintColor.copy(alpha = surfaceAlpha),
+                        tintColor.copy(alpha = surfaceAlpha * 0.7f)
+                    ),
+                    radius = 800f
+                )
+            )
+            .then(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && backdropEnabled) {
+                    Modifier.graphicsLayer {
+                        renderEffect = RenderEffect.createBlurEffect(
+                            blurRadius.toPx(),
+                            blurRadius.toPx(),
+                            Shader.TileMode.CLAMP
+                        )
+                    }
+                } else Modifier
+            )
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = highlightStrength),
+                            Color.Transparent,
+                            Color.Transparent
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(1000f, 1000f)
+                    )
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(1.dp)
+                .clip(RoundedCornerShape(cornerRadius - 1.dp))
+                .background(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = borderAlpha),
+                            Color.Transparent,
+                            Color.White.copy(alpha = borderAlpha * 0.5f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
         content()
     }
 }
 
-// Glass banner - auto fades and dismisses optionally
 @Composable
-fun GlassBanner(
-    text: String,
+fun GlassButton(
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onDismiss: (() -> Unit)? = null,
-    autoHideDelay: Long = 3000L,
+    enabled: Boolean = true,
+    surfaceAlpha: Float = 0.15f,
     tintColor: Color = MaterialTheme.colorScheme.primary,
-    surfaceAlpha: Float = 0.15f
+    content: @Composable RowScope.() -> Unit
 ) {
-    var isVisible by remember { mutableStateOf(true) }
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(),
+        label = "Glass button scale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.8f else 1f,
+        animationSpec = tween(150),
+        label = "Glass button alpha"
+    )
 
-    LaunchedEffect(autoHideDelay) {
-        if (autoHideDelay > 0) {
-            delay(autoHideDelay)
-            isVisible = false
-            onDismiss?.invoke()
-        }
-    }
-
-    if (isVisible) {
-        GlassSurface(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            surfaceAlpha = surfaceAlpha,
-            tintColor = tintColor,
-            cornerRadius = 16.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f)
-                )
-                if (onDismiss != null) {
-                    IconButton(onClick = {
-                        isVisible = false
-                        onDismiss()
-                    }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Dismiss",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp)
+    GlassSurface(
+        modifier = modifier
+            .scale(scale)
+            .alpha(alpha)
+            .then(
+                Modifier
+                    .pointerInput(enabled) {
+                        detectTapGestures(
+                            onPress = {
+                                if (enabled) {
+                                    isPressed = true
+                                    try {
+                                        tryAwaitRelease()
+                                    } finally {
+                                        isPressed = false
+                                    }
+                                }
+                            },
+                            onTap = { if (enabled) onClick() }
                         )
                     }
-                }
-            }
-        }
+            ),
+        surfaceAlpha = surfaceAlpha,
+        tintColor = tintColor,
+        cornerRadius = 16.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
     }
 }
 
-// Draggable glass-style dialog with dismiss gesture
 @Composable
-fun LiquidGlassDialog(
-    onDismissRequest: () -> Unit,
-    title: String,
+fun GlassCard(
     modifier: Modifier = Modifier,
-    confirmButton: @Composable (() -> Unit)? = null,
-    dismissButton: @Composable (() -> Unit)? = null,
-    content: @Composable () -> Unit
+    onClick: (() -> Unit)? = null,
+    surfaceAlpha: Float = 0.08f,
+    cornerRadius: Dp = 20.dp,
+    content: @Composable BoxScope.() -> Unit
 ) {
-    var dragOffset by remember { mutableStateOf(0f) }
-    val scope = rememberCoroutineScope()
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && onClick != null) 0.98f else 1f,
+        animationSpec = spring(),
+        label = "Glass card scale"
+    )
 
-    Dialog(onDismissRequest = onDismissRequest) {
-        GlassSurface(
-            modifier = modifier
-                .fillMaxWidth(0.9f)
-                .offset(y = dragOffset.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures(onPress = {
-                        tryAwaitRelease()
-                    })
-                },
-            surfaceAlpha = 0.25f,
-            cornerRadius = 24.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(16.dp))
-                content()
-                if (confirmButton != null || dismissButton != null) {
-                    Spacer(Modifier.height(24.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End)
-                    ) {
-                        dismissButton?.invoke()
-                        confirmButton?.invoke()
+    GlassSurface(
+        modifier = modifier
+            .scale(scale)
+            .then(
+                if (onClick != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                isPressed = true
+                                try {
+                                    tryAwaitRelease()
+                                } finally {
+                                    isPressed = false
+                                }
+                            },
+                            onTap = { onClick() }
+                        )
                     }
-                }
-            }
-        }
+                } else Modifier
+            ),
+        cornerRadius = cornerRadius,
+        surfaceAlpha = surfaceAlpha
+    ) {
+        content()
     }
 }
